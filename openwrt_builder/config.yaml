@@ -14,3 +14,6 @@ ingress: false
 panel_icon: mdi:router-wireless
 options: {}
 schema: {}
+ports:
+  8080/tcp: 8080
+watchdog: http://[HOST]:8080/health
