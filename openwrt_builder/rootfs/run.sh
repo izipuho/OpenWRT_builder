@@ -1,7 +1,8 @@
-#!/usr/bin/with-contenv bashio
+#!/command/with-contenv sh
 set -euo pipefail
 
 python3 /usr/local/bin/health_server.py &
 
 # TODO: тут запускай основной процесс аддона
-tail -f /dev/null
+echo "OpenWRT ImageBuilder addon started"
+sleep infinity
