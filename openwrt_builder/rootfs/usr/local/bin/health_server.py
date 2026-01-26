@@ -3,7 +3,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path in ("/health", "/healthz"):
+        if self.path == "/health":
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.end_headers()
@@ -18,4 +18,5 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 if __name__ == "__main__":
+    print("listening on 0.0.0.0:8080", flush=True)
     HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
