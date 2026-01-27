@@ -2,6 +2,6 @@
 echo "OpenWRT ImageBuilder started"
 
 set -euo pipefail
-python3 /usr/local/bin/health_server.py &
+python3 /usr/local/bin/web_api.py &
 
 sleep infinity
