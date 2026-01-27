@@ -1,7 +1,8 @@
 #!/command/with-contenv sh
-printf "\033[32mINFO\033[0m OpenWRT ImageBuilder started\r"
+
+mkdir -p /data/profiles /data/artifacts /cache
 
 set -euo pipefail
 python3 /usr/local/bin/web_api.py &
 
-sleep infinity
+printf "\033[32mINFO\033[0m OpenWRT ImageBuilder started\r"
