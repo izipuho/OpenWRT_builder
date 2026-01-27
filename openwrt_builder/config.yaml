@@ -15,6 +15,7 @@ panel_icon: mdi:router-wireless
 options: {}
 schema: {}
 map: ["data:rw"]
+tempfs: true
 ports:
   8080/tcp: 8080
 watchdog: http://[HOST]:8080/health
