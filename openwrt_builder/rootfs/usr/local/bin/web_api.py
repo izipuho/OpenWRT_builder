@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from .logger import log_info
 import json
 
 MAX_BODY_BYTES = 1024 * 1024 # 1 MiB
+
+def log_info(msg):
+    print(f"\033[32m[INFO]\033[0m {msg}", flush=True)
+def log_warn(msg):
+    print(f"\033[33m[WARN]\033[0m {msg}", flush=True)
+def log_error(msg):
+    print(f"\033[31m[ERROR]\033[0m {msg}", flush=True)
 
 class Handler(BaseHTTPRequestHandler):
     def _send_json(self, code: int, payload: dict) -> None:
