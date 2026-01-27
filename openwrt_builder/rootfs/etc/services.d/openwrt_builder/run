@@ -1,5 +1,5 @@
 #!/command/with-contenv sh
-printf "\033[32mINFO\033[0m OpenWRT ImageBuilder started"
+printf "\033[32mINFO\033[0m OpenWRT ImageBuilder started\r"
 
 set -euo pipefail
 python3 /usr/local/bin/web_api.py &
