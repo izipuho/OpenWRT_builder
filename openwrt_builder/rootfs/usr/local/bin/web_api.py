@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from .logger import log_info
 import json
 
 MAX_BODY_BYTES = 1024 * 1024 # 1 MiB
@@ -63,5 +64,5 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 if __name__ == "__main__":
-    print("\033[32mINFO\033[0m listening on 0.0.0.0:8080", flush=True)
+    log_info("listening on 0.0.0.0:8080")
     HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
