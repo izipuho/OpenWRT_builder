@@ -8,7 +8,7 @@ class Handler(BaseHTTPRequestHandler):
     def _send_json(self, code: int, payload: dict) -> None:
         data = (json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8")
         self.send_response(code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
@@ -16,7 +16,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/health":
             self.send_response(200)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(b'{"status":"ok"}\n')
             return
@@ -63,5 +63,5 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 if __name__ == "__main__":
-    print("listening on 0.0.0.0:8080", flush=True)
+    print("\033[32mINFO\033[0m listening on 0.0.0.0:8080", flush=True)
     HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
