@@ -1,7 +1,5 @@
 #!/command/with-contenv sh
 
-mkdir -p /data/profiles /data/artifacts /cache
-
 set -euo pipefail
 python3 /usr/local/bin/web_api.py &
 

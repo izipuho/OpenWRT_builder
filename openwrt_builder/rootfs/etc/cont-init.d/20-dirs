@@ -1,0 +1,5 @@
+#!/command/with-contenv sh
+
+for v in $(env | awk -F= '/_DIR=/{print $1}'); do
+  mkdir -p "$(eval echo \$$v)"
+done

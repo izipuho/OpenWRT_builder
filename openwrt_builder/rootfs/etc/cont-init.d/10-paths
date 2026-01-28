@@ -1,0 +1,5 @@
+#!/command/with-contenv sh
+
+set -a
+. /etc/openwrt_builder/paths.env
+set +a
