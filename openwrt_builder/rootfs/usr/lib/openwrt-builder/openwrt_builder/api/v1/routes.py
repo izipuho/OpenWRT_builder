@@ -1,16 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 router = APIRouter(prefix="/api/v1")
-
-_PROFILES = [
-    {
-        "profile_id": "simple-ap",
-        "name": "Simple AP",
-        "schema_version": 1,
-        "updated_at": "2026-01-30T09:00:00Z",
-    }
-]
-
 
 @router.get("/health")
 def health():
@@ -18,5 +8,5 @@ def health():
 
 
 @router.get("/profiles")
-def get_profiles():
-    return _PROFILES
+def get_profiles(req: Request):
+    return req.app.state.registry.list_profiles()
