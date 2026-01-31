@@ -7,6 +7,12 @@ from pathlib import Path
 class Registry:
     def __init__(self) -> None:
         self._profiles_dir = Path("/data/profiles")
+    
+    def debug(self):
+        res = []
+        for path in Path("/"):
+            res.append(path)
+        return res
 
     def list_profiles(self) -> list[dict]:
         profiles: list[dict] = []

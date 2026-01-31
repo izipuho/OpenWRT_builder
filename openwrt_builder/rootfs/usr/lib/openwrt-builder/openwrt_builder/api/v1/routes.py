@@ -10,3 +10,7 @@ def health():
 @router.get("/profiles")
 def get_profiles(req: Request):
     return req.app.state.registry.list_profiles()
+
+@router.get("/debug")
+def debug(req: Request):
+    return req.app.state.registry.debug()
