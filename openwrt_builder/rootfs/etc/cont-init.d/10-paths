@@ -1,11 +1,4 @@
 #!/command/with-contenv sh
-set -eux
-ls -la /etc/openwrt-builder/paths.env
-echo "--- paths.env ---"
-sed -n '1,200p' /etc/openwrt-builder/paths.env
-echo "--- exported _DIR ---"
-env | sort | awk -F= '/_DIR=/{print}'
-
 set -a
 . /etc/openwrt-builder/paths.env
 set +a
