@@ -36,8 +36,8 @@ def _atomic_write_json(path: Path, data: dict) -> None:
 
 class Registry:
     def __init__(self) -> None:
-        self._profiles_dir = Path(os.environ["PROFILES_DIR"])
-        self._lists_dir = Path(os.environ["LISTS_DIR"])
+        self._profiles_dir = Path(os.environ.get("PROFILES_DIR", "/data/profiles"))
+        self._lists_dir = Path(os.environ.get("LISTS_DIR", "/data/lists"))
     
     def debug(self):
         return Path("/").iterdir()
