@@ -32,5 +32,5 @@ class Registry:
                     )
                 except (OSError, json.JSONDecodeError):
                     continue
-        profiles.sort(key=lambda x: x.get("updated_at", reversed=True)) 
+        #profiles.sort(key=lambda x: x.get("updated_at", reversed=True)) 
         return profiles
