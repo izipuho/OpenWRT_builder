@@ -1,4 +1,18 @@
 #!/command/with-contenv sh
+set -eux
+echo "--- mkdir list ---"
+env | sort | awk -F= '/_DIR=/{print $1"="$2}'
+for v in $(env | awk -F= '/_DIR=/{print $1}'); do
+  p="$(eval echo \$$v)"
+  echo "mkdir -p: $v -> [$p]"
+  mkdir -p "$p"
+done
+echo "--- created ---"
+for v in $(env | awk -F= '/_DIR=/{print $1}'); do
+  p="$(eval echo \$$v)"
+  ls -ld "$p" || true
+done
+
 
 for v in $(env | awk -F= '/_DIR=/{print $1}'); do
   mkdir -p "$(eval echo \$$v)"
