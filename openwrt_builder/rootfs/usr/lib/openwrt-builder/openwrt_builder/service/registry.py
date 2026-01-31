@@ -10,7 +10,7 @@ class Registry:
     
     def debug(self):
         res = []
-        for path in Path("/").iterdir():
+        for path in Path("/data").iterdir():
             res.append(path)
         return res
 
