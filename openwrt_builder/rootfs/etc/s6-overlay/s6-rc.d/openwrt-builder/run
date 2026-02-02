@@ -7,7 +7,7 @@ set -a
 . /etc/openwrt-builder/paths.env
 set +a
 
-export PYTHONPATH="/app/openwrt-builder:${PYTHONPATH}"
+export PYTHONPATH="/app/openwrt-builder:${PYTHONPATH:-}"
 exec python3 -m openwrt_builder.main
 
 printf "\033[32mINFO\033[0m OpenWRT ImageBuilder started\r"
