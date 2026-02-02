@@ -1,9 +1,0 @@
-#!/command/with-contenv sh
-printf "\033[32mINFO\033[om INIT step."
-
-set -a
-printf "\033[32mINFO\033[om set a step."
-. /etc/openwrt-builder/paths.env
-printf "\033[32mINFO\033[om paths step."
-set +a
-printf "\033[32mINFO\033[om set+a step."
