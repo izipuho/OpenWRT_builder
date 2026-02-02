@@ -45,3 +45,16 @@ def debug():
 def debug_env():
     import os
     return os.environ.items()
+
+@router.post("/debug/purge-data", status_code=204)
+def purge_data(req: Request):
+    import shutil
+    from pathlib import Path
+
+    for p in (
+        Path("/data/profiles"),
+        Path("/data/lists"),
+    ):
+        if p.exists():
+            shutil.rmtree(p)
+            p.mkdir(parents=True, exist_ok=True)
