@@ -1,11 +1,13 @@
 #!/command/with-contenv sh
-printf "\033[32mINFO\033[0m INIT step.\n" >&2
+printf "\033[32mINFO\033[0m INIT step.x\n" >&2
 
 # export env paths
 set -a
+printf "\033[32mINFO\033[0m seta step.\n" >&2
 . /etc/openwrt-builder/paths.env
-set +a
 printf "\033[32mINFO\033[0m paths.env step.\n" >&2
+set +a
+printf "\033[32mINFO\033[0m set+a step.\n" >&2
 
 #env | while IFS='=' read -r k v; do
 #  case "$k" in
