@@ -16,8 +16,8 @@ def post_profile(req: Request, body: dict):
     reg = req.app.state.registry
     try:
         return reg.create_profile(body)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="invalid_request")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"code": "invalid_request", "reason": str(e)})
     except FileExistsError:
         raise HTTPException(status_code=409, detail="conflict")
 
@@ -28,13 +28,12 @@ def get_lists(req: Request):
 @router.post("/list", status_code=201)
 def post_list(req: Request, body: dict):
     reg = req.app.state.registry
-    return reg.create_list(body)
-    #try:
-    #    return reg.create_list(body)
-    #except ValueError:
-    #    raise HTTPException(status_code=400, detail="invalid_request")
-    #except FileExistsError:
-    #    raise HTTPException(status_code=409, detail="conflict")
+    try:
+        return reg.create_list(body)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"code": "invalid_request", "reason": str(e)})
+    except FileExistsError:
+        raise HTTPException(status_code=409, detail="conflict")
 
 @router.get("/debug/env")
 def debug_env():
