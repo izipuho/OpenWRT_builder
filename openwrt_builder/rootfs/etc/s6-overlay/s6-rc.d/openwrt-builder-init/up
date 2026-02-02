@@ -1,5 +1,5 @@
 #!/command/with-contenv sh
-printf "\033[32mINFO\033[0m INIT stef\n" >&2
+printf "\033[32mINFO\033[0m INIT step.\n" >&2
 set -eu
 
 # export env paths
@@ -7,17 +7,18 @@ set -a
 . /etc/openwrt-builder/paths.env
 set +a
 
-# create dirs from env
+env | grep '^OPENWRT_BUILDER_.*_DIR=' >&2
+
 while IFS='=' read -r k v; do
   case "$k" in
     OPENWRT_BUILDER_*_DIR)
-      printf "FOR $k CREATE $v\n"
+      printf "FOR [%s] CREATE [%s]\n" "$k" "$v" >&2
       [ -n "$v" ] || continue
       mkdir -p -- "$v"
     ;;
   esac
-done <<EOF
-$(env)
+done <<'EOF'
+'"$(env)"'
 EOF
 
 # copy examples
