@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import re
 import tempfile
 
+_JSON_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 
 def _now_z() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -36,8 +37,8 @@ def _atomic_write_json(path: Path, data: dict) -> None:
 
 class Registry:
     def __init__(self) -> None:
-        self._profiles_dir = Path(os.environ.get("PROFILES_DIR", "/data/profiles"))
-        self._lists_dir = Path(os.environ.get("LISTS_DIR", "/data/lists"))
+        self._profiles_dir = Path(os.environ["PROFILES_DIR"])
+        self._lists_dir = Path(os.environ["LISTS_DIR"])
     
     def debug(self):
         return Path("/").iterdir()
@@ -80,10 +81,10 @@ class Registry:
             profile_id = _slug(name)
             if not profile_id:
                 raise ValueError("profile_id")
-        if not isinstance(profile_id, str) or not _PROFILE_ID_RE.match(profile_id):
+        if not isinstance(profile_id, str) or not _JSON_ID_RE.match(profile_id):
             raise ValueError("profile_id")
 
-        path = PROFILES_DIR / f"{profile_id}.json"
+        path = self._profiles_dir / f"{profile_id}.json"
         if path.exists():
             raise FileExistsError(profile_id)
 
