@@ -1,5 +1,5 @@
 #!/command/with-contenv sh
-printf "INIT" >&2
+printf "\033[32mINFO\033[0m INIT stef\n" >&2
 set -eu
 
 # export env paths

@@ -21,7 +21,7 @@ def post_profile(req: Request, body: dict):
     except FileExistsError:
         raise HTTPException(status_code=409, detail="conflict")
 
-@router.get("lists")
+@router.get("/lists")
 def get_lists(req: Request):
     return req.app.state.registry.list_lists()
 
