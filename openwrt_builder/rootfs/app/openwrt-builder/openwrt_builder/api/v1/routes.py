@@ -57,4 +57,3 @@ def purge_data(req: Request):
     ):
         if p.exists():
             shutil.rmtree(p)
-            p.mkdir(parents=True, exist_ok=True)
