@@ -53,6 +53,7 @@ def _list_configs(conifgs_path: Path) -> list[dict]:
     return configs
 
 def _create_config(config_path: Path, full_config: dict) -> dict:
+    print(f"Incoming data:\n{full_config}")
     name = full_config["name"]
     schema_version = full_config["schema_version"]
     config_type = f"{config_path.name[:-1]}"
@@ -65,9 +66,7 @@ def _create_config(config_path: Path, full_config: dict) -> dict:
     if not isinstance(config, dict):
         raise ValueError(config_type)
 
-    config_id = config[f"{config_type}_id"]
-    if config_id is None:
-        config_id = _slug(name)
+    config_id = config.get(f"{config_type}_id", _slug(name))
     if not isinstance(config_id, str) or not _JSON_ID_RE.match(config_id):
         raise ValueError(f"{config_type}_id")
     
