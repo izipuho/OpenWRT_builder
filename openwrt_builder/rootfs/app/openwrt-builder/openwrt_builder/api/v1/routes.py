@@ -35,7 +35,7 @@ def post_list(req: Request, body: dict):
     except FileExistsError:
         raise HTTPException(status_code=409, detail="conflict")
 
-@router.get("/debug"):
+@router.get("/debug")
 def debug():
     import os
     from pathlib import Path
