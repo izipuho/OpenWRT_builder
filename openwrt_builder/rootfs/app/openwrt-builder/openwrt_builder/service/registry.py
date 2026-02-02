@@ -52,86 +52,56 @@ def _list_configs(conifgs_path: Path) -> list[dict]:
                 continue
     return configs
 
+def _create_config(config_path: Path, full_config: dict) -> dict:
+    name = full_config["name"]
+    schema_version = full_config["schema_version"]
+    config_type = f"{config_path.name[:-1]}"
+    config = full_config[config_type]
+
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError("name")
+    if not isinstance(schema_version, int):
+        raise ValueError("schema_version")
+    if not isinstance(config, dict):
+        raise ValueError(config_type)
+
+    config_id = config[f"{config_type}_id"]
+    if config_id is None:
+        config_id = _slug(name)
+    if not isinstance(config_id, str) or not _JSON_ID_RE.match(config_id):
+        raise ValueError(f"{config_type}_id")
+    
+    path = config_path / f"{config_id}.json"
+    if path.exists():
+        raise FileExistsError(config_id)
+    
+    out = {
+        "updated_at": _now_z(),
+        **full_config
+    }
+
+    _atomic_write_json(path, out)
+
+    return {f"{config_type}_id": config_id, **out}
 
 class Registry:
     def __init__(self) -> None:
         self._profiles_dir = Path(os.environ["OPENWRT_BUILDER_PROFILES_DIR"])
         self._lists_dir = Path(os.environ["OPENWRT_BUILDER_LISTS_DIR"])
     
-    def debug(self):
-        return Path("/").iterdir()
-
     def list_profiles(self) -> list[dict]:
         profiles: list[dict] = _list_configs(self._profiles_dir)
         #profiles.sort(key=lambda x: x.get("updated_at", reversed=True)) 
         return profiles
     
     def create_profile(self, profile: dict) -> dict:
-        name = profile.get("name")
-        schema_version = profile.get("schema_version")
-        profile = profile.get("profile")
-
-        if not isinstance(name, str) or not name.strip():
-            raise ValueError("name")
-        if not isinstance(schema_version, int):
-            raise ValueError("schema_version")
-        if not isinstance(profile, dict):
-            raise ValueError("profile")
-
-        profile_id = profile.get("profile_id")
-        if profile_id is None:
-            profile_id = _slug(name)
-        if not isinstance(profile_id, str) or not _JSON_ID_RE.match(profile_id):
-            raise ValueError("profile_id")
-
-        path = self._profiles_dir / f"{profile_id}.json"
-        if path.exists():
-            raise FileExistsError(profile_id)
-
-        out = {
-            "name": name,
-            "schema_version": schema_version,
-            "updated_at": _now_z(),
-            "profile": profile,
-        }
-        _atomic_write_json(path, out)
-
-        # API-ответ включает id, хотя в файле id не храним
-        return {"profile_id": profile_id, **out}
+        data: dict = _create_config(self._profiles_dir, profile)
+        return data
 
     def list_lists(self) -> list[dict]:
         lists: list[dict] = _list_configs(self._lists_dir)
         return lists
 
     def create_list(self, list_data: dict) -> dict:
-        name = list_data.get("name")
-        schema_version = list_data.get("schema_version")
-        list_data = list_data.get("list")
-
-        if not isinstance(name, str) or not name.strip():
-            raise ValueError("name")
-        if not isinstance(schema_version, int):
-            raise ValueError("schema_version")
-        if not isinstance(list_data, dict):
-            raise ValueError("list")
-
-        list_id = list_data.get("list_id")
-        if profile_id is None:
-            profile_id = _slug(name)
-        if not isinstance(profile_id, str) or not _JSON_ID_RE.match(profile_id):
-            raise ValueError("profile_id")
-
-        path = self._profiles_dir / f"{profile_id}.json"
-        if path.exists():
-            raise FileExistsError(profile_id)
-
-        out = {
-            "name": name,
-            "schema_version": schema_version,
-            "updated_at": _now_z(),
-            "profile": profile,
-        }
-        _atomic_write_json(path, out)
-
-        # API-ответ включает id, хотя в файле id не храним
-        return {"profile_id": profile_id, **out}
+        data: dict = _create_config(self._lists_dir, list_data)
+        return data
