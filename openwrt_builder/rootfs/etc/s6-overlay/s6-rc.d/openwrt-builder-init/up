@@ -10,7 +10,7 @@ set +a
 env | while IFS='=' read -r k v; do
   case "$k" in
     OPENWRT_BUILDER_*_DIR)
-      printf "FOR [%s] CREATE [%s]\n" "$k" "$v" >&2
+      printf "FOR [%s] CREATE [%s]\n" "$k" "$v"
       [ -n "$v" ] || continue
       mkdir -p -- "$v"
     ;;
