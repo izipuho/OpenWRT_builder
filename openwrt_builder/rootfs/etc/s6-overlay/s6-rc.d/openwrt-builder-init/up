@@ -7,9 +7,7 @@ set -a
 . /etc/openwrt-builder/paths.env
 set +a
 
-env | grep '^OPENWRT_BUILDER_.*_DIR=' >&2
-
-while IFS='=' read -r k v; do
+env | while IFS='=' read -r k v; do
   case "$k" in
     OPENWRT_BUILDER_*_DIR)
       printf "FOR [%s] CREATE [%s]\n" "$k" "$v" >&2
@@ -17,9 +15,7 @@ while IFS='=' read -r k v; do
       mkdir -p -- "$v"
     ;;
   esac
-done <<'EOF'
-'"$(env)"'
-EOF
+done
 
 # copy examples
 # mkdir -p "$EXAMPLES_DIR"
