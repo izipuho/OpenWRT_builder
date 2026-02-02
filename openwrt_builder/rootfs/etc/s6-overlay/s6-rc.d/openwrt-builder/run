@@ -1,5 +1,5 @@
 #!/command/with-contenv sh
-printf "\033[32mINFO\033[0m Starting OpenWRT ImageBuilder\r"
+printf "\033[32mINFO\033[0m Starting OpenWRT ImageBuilder\n"
 
 set -eu
 # export env paths
@@ -10,4 +10,4 @@ set +a
 export PYTHONPATH="/app/openwrt-builder:${PYTHONPATH:-}"
 exec python3 -m openwrt_builder.main
 
-printf "\033[32mINFO\033[0m OpenWRT ImageBuilder started\r"
+printf "\033[32mINFO\033[0m OpenWRT ImageBuilder started\n"
