@@ -20,21 +20,20 @@ def _slug(s: str) -> str:
 
 
 def _atomic_write_json(path: Path, data: dict) -> None:
-    print(f"AtWrite data: {path}")
-    fd, tmp = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
-    print(f"AtWrite TMP: {fd, tmp}")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp, path)
-    finally:
-        try:
-            if os.path.exists(tmp):
-                os.remove(tmp)
-        except OSError:
-            pass
+    tmp_dir = Path("/tmp")
+
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=tmp_dir,
+        delete=False,
+    ) as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+        tmp_name = f.name
+
+    os.replace(tmp_name, path)
 
 def _list_configs(conifgs_path: Path) -> list[dict]:
     configs: list[dict] = []
@@ -55,7 +54,6 @@ def _list_configs(conifgs_path: Path) -> list[dict]:
     return configs
 
 def _create_config(config_path: Path, full_config: dict) -> dict:
-    print(f"Incoming data:\n{full_config}")
     name = full_config["name"]
     schema_version = full_config["schema_version"]
     config_type = f"{config_path.name[:-1]}"
