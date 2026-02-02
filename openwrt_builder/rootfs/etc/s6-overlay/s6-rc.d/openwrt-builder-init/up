@@ -12,7 +12,7 @@ while IFS='=' read -r k v; do
   case "$k" in
     OPENWRT_BUILDER_*_DIR)
       [ -n "$v" ] || continue
-      mkdir -p -- "$v"
+      mkdir -pv -- "$v"
     ;;
   esac
 done <<EOF
