@@ -1,7 +1,7 @@
 name: "OpenWRT Builder"
 slug: "openwrt_builder"
 description: "OpenWRT ImageBuilder backend for Home Assistant"
-version: "0.3.5"
+version: "0.3.6"
 startup: services
 boot: auto
 arch:
