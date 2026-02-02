@@ -1,4 +1,5 @@
 #!/command/with-contenv sh
+printf "INIT" >&2
 set -eu
 
 # export env paths
@@ -7,11 +8,16 @@ set -a
 set +a
 
 # create dirs from env
-env | while IFS='=' read -r k v; do
+while IFS='=' read -r k v; do
   case "$k" in
-    OPENWRT_BUILDER_*_DIR) mkdir -p "$v" ;;
+    OPENWRT_BUILDER_*_DIR)
+      [ -n "$v" ] || continue
+      mkdir -p -- "$v"
+    ;;
   esac
-done
+done <<EOF
+$(env)
+EOF
 
 # copy examples
 # mkdir -p "$EXAMPLES_DIR"
