@@ -1,8 +1,4 @@
 #!/command/with-contenv sh
-printf "UP: %s\n" "$0" >&2
-wc -l "$0" >&2
-od -An -t x1 -N 256 "$0" >&2
-
 printf "\033[32mINFO\033[0m INIT step.\n" >&2
 set -eu
 printf "\033[32mINFO\033[0m set -eu step.\n" >&2
