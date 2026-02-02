@@ -11,8 +11,9 @@ set +a
 while IFS='=' read -r k v; do
   case "$k" in
     OPENWRT_BUILDER_*_DIR)
+      echo "FOR $k CREATE $v\n"
       [ -n "$v" ] || continue
-      mkdir -pv -- "$v"
+      mkdir -p -- "$v"
     ;;
   esac
 done <<EOF
