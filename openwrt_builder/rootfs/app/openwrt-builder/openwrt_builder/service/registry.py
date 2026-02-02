@@ -20,7 +20,9 @@ def _slug(s: str) -> str:
 
 
 def _atomic_write_json(path: Path, data: dict) -> None:
+    print(f"AtWrite data: {path}")
     fd, tmp = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
+    print(f"AtWrite TMP: {fd, tmp}")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
