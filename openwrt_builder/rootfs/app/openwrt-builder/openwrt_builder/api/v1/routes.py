@@ -27,7 +27,9 @@ def get_lists(req: Request):
 
 @router.post("/list", status_code=201)
 def post_list(req: Request, body: dict):
+    print("AAAAAAAAA")
     reg = req.app.state.registry
+    print("BBBBBBBBB")
     try:
         return reg.create_list(body)
     except ValueError:

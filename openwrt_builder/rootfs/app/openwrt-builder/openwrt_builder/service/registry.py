@@ -102,5 +102,6 @@ class Registry:
         return lists
 
     def create_list(self, list_data: dict) -> dict:
+        print("Trying to create list")
         data: dict = _create_config(self._lists_dir, list_data)
         return data
