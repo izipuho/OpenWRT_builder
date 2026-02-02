@@ -1,3 +1,0 @@
-#!/command/with-contenv sh
-
-cp /usr/share/openwrt-builder/examples/profile.json /data/profiles/example.json

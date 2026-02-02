@@ -1,3 +1,0 @@
-#!/usr/bin/env sh
-export PYTHONPATH="/usr/lib/openwrt-builder:${PYTHONPATH}"
-exec python3 -m openwrt_builder.main

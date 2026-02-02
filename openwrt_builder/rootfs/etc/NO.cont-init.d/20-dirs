@@ -1,9 +1,0 @@
-#!/command/with-contenv sh
-set -eu
-
-. /etc/openwrt-builder/paths.env
-
-for v in $(set | awk -F= '/_DIR=/{print $1}'); do
-  p="$(eval echo \$$v)"
-  mkdir -p "$p"
-done
