@@ -34,3 +34,12 @@ def post_list(req: Request, body: dict):
         raise HTTPException(status_code=400, detail={"code": "invalid_request", "reason": str(e)})
     except FileExistsError:
         raise HTTPException(status_code=409, detail="conflict")
+
+@router.get("/debug", status_code=201)
+def debug(req: Request, body: dict) -> list:
+    res: list = []
+    if body["command"] == "ls" and dir:
+        from pathlib import Path
+        for path in Path(dir).iterdir():
+            res.append(path)
+    return res
