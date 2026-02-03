@@ -111,5 +111,5 @@ class Registry:
         return _create_config(self._lists_dir, list_data, list_id, force)
 
     def delete_list(self, list_id: str):
-        return _delete_config(self._profiles_dir, list_id)
+        return _delete_config(self._lists_dir, list_id)
 
