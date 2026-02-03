@@ -82,7 +82,7 @@ def get_list(req: Request, list_id: str):
     except FileNotFoundError:
         raise HTTPException(
             status_code=404,
-            detail={"code": "not_found", "reason": "profile_not_found"},
+            detail={"code": "not_found", "reason": "list_not_found"},
         )
 
 @router.post("/list", status_code=201)
