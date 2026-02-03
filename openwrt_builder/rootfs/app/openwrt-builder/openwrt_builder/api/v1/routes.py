@@ -38,8 +38,8 @@ def post_list(req: Request, body: dict):
 @router.post("/debug", status_code=201)
 def debug(req: Request, body: dict) -> list:
     res: list = []
-    if body["command"] == "ls" and dir:
+    if body["command"] == "ls":
         from pathlib import Path
-        for path in Path(dir).iterdir():
+        for path in Path(body["path"]).iterdir():
             res.append(path)
     return res
