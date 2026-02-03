@@ -50,27 +50,27 @@ def _list_configs(conifgs_path: Path) -> list[dict]:
                 )
             except (OSError, json.JSONDecodeError):
                 continue
+    configs.sort(key=lambda x: x["updated_at"])
     return configs
 
-def _create_config(config_path: Path, full_config: dict) -> dict:
+def _create_config(config_path: Path, full_config: dict, config_id: str = None, force: bool = False) -> dict:
     name = full_config["name"]
     schema_version = full_config["schema_version"]
     config_type = f"{config_path.name[:-1]}"
-    config = full_config[config_type]
 
     if not isinstance(name, str) or not name.strip():
         raise ValueError("name")
     if not isinstance(schema_version, int):
         raise ValueError("schema_version")
-    if not isinstance(config, dict):
+    if not isinstance(full_config[config_type], dict):
         raise ValueError(config_type)
 
-    config_id = config.get(f"{config_type}_id", _slug(name))
+    config_id = config_id or full_config.get(f"{config_type}_id", _slug(name))
     if not isinstance(config_id, str) or not _JSON_ID_RE.match(config_id):
         raise ValueError(f"{config_type}_id")
     
     path = config_path / f"{config_id}.json"
-    if path.exists():
+    if path.exists() and not force:
         raise FileExistsError(config_id)
     
     out = {
@@ -82,24 +82,34 @@ def _create_config(config_path: Path, full_config: dict) -> dict:
 
     return {f"{config_type}_id": config_id, **out}
 
+def _delete_config(config_path: Path, config_id: str) -> bool:
+    config_type = f"{config_path.name[:-1]}"
+    path = config_path / f"{config_id}.json"
+    if not path.exists():
+        raise FileNotFoundError(config_id)
+    path.unlink()
+    return {f"{config_type}_id": config_id, "deleted": True}
+
 class Registry:
     def __init__(self) -> None:
         self._profiles_dir = Path(os.environ["OPENWRT_BUILDER_PROFILES_DIR"])
         self._lists_dir = Path(os.environ["OPENWRT_BUILDER_LISTS_DIR"])
     
     def list_profiles(self) -> list[dict]:
-        profiles: list[dict] = _list_configs(self._profiles_dir)
-        #profiles.sort(key=lambda x: x.get("updated_at", reversed=True)) 
-        return profiles
+        return _list_configs(self._profiles_dir)
     
-    def create_profile(self, profile: dict) -> dict:
-        data: dict = _create_config(self._profiles_dir, profile)
-        return data
+    def create_profile(self, profile: dict, profile_id: str = None, force: bool = False) -> dict:
+        return _create_config(self._profiles_dir, profile, profile_id, force)
+    
+    def delete_profile(self, profile_id: str):
+        return _delete_config(self._profiles_dir, profile_id)
 
     def list_lists(self) -> list[dict]:
-        lists: list[dict] = _list_configs(self._lists_dir)
-        return lists
+        return _list_configs(self._lists_dir)
 
-    def create_list(self, list_data: dict) -> dict:
-        data: dict = _create_config(self._lists_dir, list_data)
-        return data
+    def create_list(self, list_data: dict, list_id: str = None, force: bool = False) -> dict:
+        return _create_config(self._lists_dir, list_data, list_id, force)
+
+    def delete_list(self, list_id: str):
+        return _delete_config(self._profiles_dir, list_id)
+
