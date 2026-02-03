@@ -5,19 +5,18 @@ import os
 from datetime import datetime, timezone
 import re
 import tempfile
+import shutil
 
 _JSON_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 
 def _now_z() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-
 def _slug(s: str) -> str:
     s = s.strip().lower()
     s = re.sub(r"[^a-z0-9]+", "-", s)
     s = re.sub(r"-{2,}", "-", s).strip("-")
     return s
-
 
 def _atomic_write_json(path: Path, data: dict) -> None:
     tmp_dir = Path("/tmp")
@@ -33,7 +32,7 @@ def _atomic_write_json(path: Path, data: dict) -> None:
         os.fsync(f.fileno())
         tmp_name = f.name
 
-    os.replace(tmp_name, path)
+    shutil.move(tmp_name, path)
 
 def _list_configs(conifgs_path: Path) -> list[dict]:
     configs: list[dict] = []
