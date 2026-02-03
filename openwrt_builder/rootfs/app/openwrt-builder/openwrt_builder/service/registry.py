@@ -53,6 +53,15 @@ def _list_configs(conifgs_path: Path) -> list[dict]:
     configs.sort(key=lambda x: x["updated_at"])
     return configs
 
+def _get_config(config_path: Path, config_id: str) -> dict:
+    config_type = f"{config_path.name[:-1]}"
+    path = config_path / f"{config_id}.json"
+    if not path.exists():
+        raise FileNotFoundError(config_id)
+
+    with path.open("r", encoding="utf-8") as f:
+        return {f"{config_type}_id": config_id, **json.load(f)}
+
 def _create_config(config_path: Path, full_config: dict, config_id: str = None, force: bool = False) -> dict:
     name = full_config["name"]
     schema_version = full_config["schema_version"]
@@ -98,6 +107,9 @@ class Registry:
     def list_profiles(self) -> list[dict]:
         return _list_configs(self._profiles_dir)
     
+    def get_profile(self, profile_id: str) -> dict:
+        return _get_config(self._profiles_dir, profile_id)
+    
     def create_profile(self, profile: dict, profile_id: str = None, force: bool = False) -> dict:
         return _create_config(self._profiles_dir, profile, profile_id, force)
     
@@ -106,6 +118,9 @@ class Registry:
 
     def list_lists(self) -> list[dict]:
         return _list_configs(self._lists_dir)
+    
+    def get_list(self, list_id: str) -> dict:
+        return _get_config(self._lists_dir, list_id)
 
     def create_list(self, list_data: dict, list_id: str = None, force: bool = False) -> dict:
         return _create_config(self._lists_dir, list_data, list_id, force)

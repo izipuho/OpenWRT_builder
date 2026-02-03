@@ -11,6 +11,17 @@ def health():
 def get_profiles(req: Request):
     return req.app.state.registry.list_profiles()
 
+@router.get("/profile/{profile_id}", status_code=200)
+def get_profile(req: Request, profile_id: str):
+    reg = req.app.state.registry
+    try:
+        return reg.get_profile(profile_id)
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "not_found", "reason": "profile_not_found"},
+        )
+
 @router.post("/profile", status_code=201)
 def post_profile(req: Request, body: dict):
     reg = req.app.state.registry
@@ -62,6 +73,17 @@ def delete_profile(req: Request, profile_id: str):
 @router.get("/lists")
 def get_lists(req: Request):
     return req.app.state.registry.list_lists()
+
+@router.get("/list/{list_id}", status_code=200)
+def get_list(req: Request, list_id: str):
+    reg = req.app.state.registry
+    try:
+        return reg.get_list(list_id)
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "not_found", "reason": "profile_not_found"},
+        )
 
 @router.post("/list", status_code=201)
 def post_list(req: Request, body: dict):
