@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
 
-router = APIRouter(prefix="/api/v1")
+router = APIRouter(prefix="/api/v1", tags=["profiles", "lists"])
 
 @router.get("/health")
 def health():
