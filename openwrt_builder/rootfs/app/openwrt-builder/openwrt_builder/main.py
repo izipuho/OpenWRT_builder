@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI
-from openwrt_builder.api.v1.routes import router
+from openwrt_builder.api.v1.profiles import router
 from openwrt_builder.service.registry import Lists, Profiles
 
 app = FastAPI(title="OpenWRT Builder", version="v1")
