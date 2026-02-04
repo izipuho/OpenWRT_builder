@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
+from openwrt_builder.service.build_queue import BuildQueue
 from openwrt_builder.service.profiles_registry import BaseRegistry, ProfilesRegistry
 
 
@@ -26,6 +28,10 @@ class BuildsRegistry:
         self._builds_path = builds_path
         self._builds_path.mkdir(parents=True, exist_ok=True)
         self._profiles = profiles
+        runtime_dir = os.environ.get("OPENWRT_BUILDER_RUNTIME_DIR")
+        self._queue: BuildQueue | None = None
+        if runtime_dir:
+            self._queue = BuildQueue(Path(runtime_dir) / "queue.json")
 
     def _build_path(self, build_id: str) -> Path:
         """Return the path for a build JSON file by ID."""
@@ -53,6 +59,15 @@ class BuildsRegistry:
     def _write_build(self, build_id: str, payload: dict) -> None:
         """Persist a build JSON payload to disk atomically."""
         BaseRegistry._atomic_write_json(self._build_path(build_id), payload)
+
+    def update_build(self, build_id: str, updates: dict) -> dict:
+        """Update a build payload with the provided fields."""
+        build = self._read_build(build_id)
+        build.update(updates)
+        if "updated_at" not in updates:
+            build["updated_at"] = BaseRegistry._now_z()
+        self._write_build(build_id, build)
+        return build
 
     @staticmethod
     def _normalize_request(request: dict) -> dict:
@@ -131,8 +146,12 @@ class BuildsRegistry:
             "message": None,
             "request": request,
             "result": None,
+            "cancel_requested": False,
+            "runner_pid": None,
         }
         self._write_build(build_id, build)
+        if self._queue is not None:
+            self._queue.enqueue(build_id)
         return build, True
 
     def cancel_build(self, build_id: str) -> bool:
@@ -148,11 +167,21 @@ class BuildsRegistry:
         build = self._read_build(build_id)
         if build["state"] in {"done", "failed", "canceled"}:
             return False
-        build["state"] = "canceled"
-        build["updated_at"] = BaseRegistry._now_z()
-        build["message"] = "canceled"
-        self._write_build(build_id, build)
-        return True
+        if build["state"] == "queued":
+            build["state"] = "canceled"
+            build["updated_at"] = BaseRegistry._now_z()
+            build["message"] = "canceled"
+            self._write_build(build_id, build)
+            if self._queue is not None:
+                self._queue.remove(build_id)
+            return True
+        if build["state"] == "running":
+            build["cancel_requested"] = True
+            build["updated_at"] = BaseRegistry._now_z()
+            build["message"] = "cancel_requested"
+            self._write_build(build_id, build)
+            return True
+        return False
 
     def get_build_download(self, build_id: str) -> str:
         """Return the filesystem path to a completed build artifact.
