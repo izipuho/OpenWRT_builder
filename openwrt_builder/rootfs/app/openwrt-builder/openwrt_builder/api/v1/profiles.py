@@ -1,18 +1,22 @@
+"""Profiles and lists API endpoints (v1)."""
 from fastapi import APIRouter, HTTPException, Request
 
 router = APIRouter(prefix="/api/v1", tags=["profiles", "lists"])
 
 @router.get("/health")
 def health():
+    """Return a basic health check response."""
     return {"status": "ok"}
 
 # Manage Profiles
 @router.get("/profiles")
 def get_profiles(req: Request):
+    """Return all available profile definitions."""
     return req.app.state.registry.list_profiles()
 
 @router.get("/profile/{profile_id}", status_code=200)
 def get_profile(req: Request, profile_id: str):
+    """Return a single profile by ID."""
     reg = req.app.state.registry
     try:
         return reg.get_profile(profile_id)
@@ -24,6 +28,7 @@ def get_profile(req: Request, profile_id: str):
 
 @router.post("/profile", status_code=201)
 def post_profile(req: Request, body: dict):
+    """Create a new profile."""
     reg = req.app.state.registry
     try:
         return reg.create_profile(body)
@@ -34,6 +39,7 @@ def post_profile(req: Request, body: dict):
 
 @router.put("/profile/{profile_id}", status_code=200)
 def put_profile(req: Request, profile_id: str, body: dict):
+    """Create or replace a profile by ID."""
     reg = req.app.state.registry
     try:
         return reg.create_profile(body, profile_id, True)
@@ -55,6 +61,7 @@ def put_profile(req: Request, profile_id: str, body: dict):
 
 @router.delete("/profile/{profile_id}", status_code=200)
 def delete_profile(req: Request, profile_id: str):
+    """Delete a profile by ID."""
     reg = req.app.state.registry
     try:
         return reg.delete_profile(profile_id)
@@ -72,10 +79,12 @@ def delete_profile(req: Request, profile_id: str):
 # Manage lists
 @router.get("/lists")
 def get_lists(req: Request):
+    """Return all available list definitions."""
     return req.app.state.registry.list_lists()
 
 @router.get("/list/{list_id}", status_code=200)
 def get_list(req: Request, list_id: str):
+    """Return a single list by ID."""
     reg = req.app.state.registry
     try:
         return reg.get_list(list_id)
@@ -87,6 +96,7 @@ def get_list(req: Request, list_id: str):
 
 @router.post("/list", status_code=201)
 def post_list(req: Request, body: dict):
+    """Create a new list."""
     reg = req.app.state.registry
     try:
         return reg.create_list(body)
@@ -97,6 +107,7 @@ def post_list(req: Request, body: dict):
 
 @router.put("/list/{list_id}", status_code=200)
 def put_list(req: Request, list_id: str, body: dict):
+    """Create or replace a list by ID."""
     reg = req.app.state.registry
     try:
         return reg.create_list(body, list_id, True)
@@ -118,6 +129,7 @@ def put_list(req: Request, list_id: str, body: dict):
 
 @router.delete("/list/{list_id}", status_code=200)
 def delete_list(req: Request, list_id: str):
+    """Delete a list by ID."""
     reg = req.app.state.registry
     try:
         return reg.delete_list(list_id)
@@ -135,6 +147,7 @@ def delete_list(req: Request, list_id: str):
 # Misc
 @router.post("/debug", status_code=201)
 def debug(req: Request, body: dict) -> list:
+    """Run simple debug commands and return results."""
     res: list = []
     if body["command"] == "ls":
         from pathlib import Path
