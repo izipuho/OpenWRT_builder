@@ -9,122 +9,125 @@ import shutil
 
 _JSON_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 
-def _now_z() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+class BaseRegistry:
+    def __init__(self, configs_path: Path) -> None:
+        self._configs_path = configs_path
+        self._config_type = f"{configs_path.name[:-1]}"
 
-def _slug(s: str) -> str:
-    s = s.strip().lower()
-    s = re.sub(r"[^a-z0-9]+", "-", s)
-    s = re.sub(r"-{2,}", "-", s).strip("-")
-    return s
+    @staticmethod
+    def _now_z() -> str:
+        return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-def _atomic_write_json(path: Path, data: dict) -> None:
-    tmp_dir = Path("/tmp")
+    @staticmethod
+    def _slug(value: str) -> str:
+        value = value.strip().lower()
+        value = re.sub(r"[^a-z0-9]+", "-", value)
+        value = re.sub(r"-{2,}", "-", value).strip("-")
+        return value
 
-    with tempfile.NamedTemporaryFile(
-        mode="w",
-        encoding="utf-8",
-        dir=tmp_dir,
-        delete=False,
-    ) as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-        f.flush()
-        os.fsync(f.fileno())
-        tmp_name = f.name
+    @staticmethod
+    def _atomic_write_json(path: Path, data: dict) -> None:
+        tmp_dir = Path("/tmp")
 
-    shutil.move(tmp_name, path)
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=tmp_dir,
+            delete=False,
+        ) as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+            tmp_name = f.name
 
-def _list_configs(conifgs_path: Path) -> list[dict]:
-    configs: list[dict] = []
-    if conifgs_path.exists():
-        for path in conifgs_path.glob("*.json"):
-            try:
-                with path.open("r", encoding="utf-8") as f:
-                    data = json.load(f)
-                
-                configs.append(
-                    {
-                        f"{conifgs_path.name[:-1]}_id": path.stem,
-                        **data
-                    }
-                )
-            except (OSError, json.JSONDecodeError):
-                continue
-    configs.sort(key=lambda x: x["updated_at"])
-    return configs
+        shutil.move(tmp_name, path)
 
-def _get_config(config_path: Path, config_id: str) -> dict:
-    config_type = f"{config_path.name[:-1]}"
-    path = config_path / f"{config_id}.json"
-    if not path.exists():
-        raise FileNotFoundError(config_id)
+    def list_configs(self) -> list[dict]:
+        configs: list[dict] = []
+        if self._configs_path.exists():
+            for path in self._configs_path.glob("*.json"):
+                try:
+                    with path.open("r", encoding="utf-8") as f:
+                        data = json.load(f)
 
-    with path.open("r", encoding="utf-8") as f:
-        return {f"{config_type}_id": config_id, **json.load(f)}
+                    configs.append(
+                        {
+                            f"{self._config_type}_id": path.stem,
+                            **data
+                        }
+                    )
+                except (OSError, json.JSONDecodeError):
+                    continue
+        configs.sort(key=lambda x: x["updated_at"])
+        return configs
 
-def _create_config(config_path: Path, full_config: dict, config_id: str = None, force: bool = False) -> dict:
-    name = full_config["name"]
-    schema_version = full_config["schema_version"]
-    config_type = f"{config_path.name[:-1]}"
+    def get_config(self, config_id: str) -> dict:
+        path = self._configs_path / f"{config_id}.json"
+        if not path.exists():
+            raise FileNotFoundError(config_id)
 
-    if not isinstance(name, str) or not name.strip():
-        raise ValueError("name")
-    if not isinstance(schema_version, int):
-        raise ValueError("schema_version")
-    if not isinstance(full_config[config_type], dict):
-        raise ValueError(config_type)
+        with path.open("r", encoding="utf-8") as f:
+            return {f"{self._config_type}_id": config_id, **json.load(f)}
 
-    config_id = config_id or full_config.get(f"{config_type}_id", _slug(name))
-    if not isinstance(config_id, str) or not _JSON_ID_RE.match(config_id):
-        raise ValueError(f"{config_type}_id")
-    
-    path = config_path / f"{config_id}.json"
-    if path.exists() and not force:
-        raise FileExistsError(config_id)
-    
-    out = {
-        "updated_at": _now_z(),
-        **full_config
-    }
+    def create_config(self, full_config: dict, config_id: str = None, force: bool = False) -> dict:
+        name = full_config["name"]
+        schema_version = full_config["schema_version"]
 
-    _atomic_write_json(path, out)
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("name")
+        if not isinstance(schema_version, int):
+            raise ValueError("schema_version")
+        if not isinstance(full_config[self._config_type], dict):
+            raise ValueError(self._config_type)
 
-    return {f"{config_type}_id": config_id, **out}
+        config_id = config_id or full_config.get(f"{self._config_type}_id", self._slug(name))
+        if not isinstance(config_id, str) or not _JSON_ID_RE.match(config_id):
+            raise ValueError(f"{self._config_type}_id")
 
-def _delete_config(config_path: Path, config_id: str) -> bool:
-    config_type = f"{config_path.name[:-1]}"
-    path = config_path / f"{config_id}.json"
-    if not path.exists():
-        raise FileNotFoundError(config_id)
-    path.unlink()
-    return {f"{config_type}_id": config_id, "deleted": True}
+        path = self._configs_path / f"{config_id}.json"
+        if path.exists() and not force:
+            raise FileExistsError(config_id)
 
-class Registry:
-    def __init__(self) -> None:
-        self._profiles_dir = Path(os.environ["OPENWRT_BUILDER_PROFILES_DIR"])
-        self._lists_dir = Path(os.environ["OPENWRT_BUILDER_LISTS_DIR"])
-    
-    def list_profiles(self) -> list[dict]:
-        return _list_configs(self._profiles_dir)
-    
-    def get_profile(self, profile_id: str) -> dict:
-        return _get_config(self._profiles_dir, profile_id)
-    
-    def create_profile(self, profile: dict, profile_id: str = None, force: bool = False) -> dict:
-        return _create_config(self._profiles_dir, profile, profile_id, force)
-    
-    def delete_profile(self, profile_id: str):
-        return _delete_config(self._profiles_dir, profile_id)
+        out = {
+            "updated_at": self._now_z(),
+            **full_config
+        }
 
-    def list_lists(self) -> list[dict]:
-        return _list_configs(self._lists_dir)
-    
-    def get_list(self, list_id: str) -> dict:
-        return _get_config(self._lists_dir, list_id)
+        self._atomic_write_json(path, out)
 
-    def create_list(self, list_data: dict, list_id: str = None, force: bool = False) -> dict:
-        return _create_config(self._lists_dir, list_data, list_id, force)
+        return {f"{self._config_type}_id": config_id, **out}
 
-    def delete_list(self, list_id: str):
-        return _delete_config(self._lists_dir, list_id)
+    def delete_config(self, config_id: str) -> bool:
+        path = self._configs_path / f"{config_id}.json"
+        if not path.exists():
+            raise FileNotFoundError(config_id)
+        path.unlink()
+        return {f"{self._config_type}_id": config_id, "deleted": True}
 
+
+class Profiles(BaseRegistry):
+    def list(self) -> list[dict]:
+        return self.list_configs()
+
+    def get(self, profile_id: str) -> dict:
+        return self.get_config(profile_id)
+
+    def create(self, profile: dict, profile_id: str = None, force: bool = False) -> dict:
+        return self.create_config(profile, profile_id, force)
+
+    def delete(self, profile_id: str) -> bool:
+        return self.delete_config(profile_id)
+
+
+class Lists(BaseRegistry):
+    def list(self) -> list[dict]:
+        return self.list_configs()
+
+    def get(self, list_id: str) -> dict:
+        return self.get_config(list_id)
+
+    def create(self, list_data: dict, list_id: str = None, force: bool = False) -> dict:
+        return self.create_config(list_data, list_id, force)
+
+    def delete(self, list_id: str) -> bool:
+        return self.delete_config(list_id)
