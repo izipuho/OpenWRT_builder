@@ -33,10 +33,7 @@ def health():
     """Return a basic health check response."""
     return {"status": "ok"}
 
-# =========================
 # Manage Profiles
-# =========================
-
 @router.get("/profiles")
 def get_profiles(req: Request):
     """Return all available profile definitions."""
@@ -86,10 +83,7 @@ def delete_profile(req: Request, profile_id: str):
     except Exception as e:
         raise http_500(e)
 
-# =========================
 # Manage lists
-# =========================
-
 @router.get("/lists")
 def get_lists(req: Request):
     """Return all available list definitions."""
@@ -139,10 +133,7 @@ def delete_list(req: Request, list_id: str):
     except Exception as e:
         raise http_500(e)
 
-# =========================
 # Misc
-# =========================
-
 @router.post("/debug", status_code=201)
 def debug(req: Request, body: dict) -> list:
     """Run simple debug commands and return results."""
