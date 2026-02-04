@@ -82,6 +82,8 @@ class BuildSummaryOut(BaseModel):
     updated_at: datetime
     progress: int = Field(ge=0, le=100)
     message: str|None = None
+    cancel_requested: bool = False
+    runner_pid: int | None = None
 
 
 class BuildResultOut(BaseModel):
