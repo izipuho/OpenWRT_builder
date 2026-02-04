@@ -10,7 +10,7 @@ This module defines the HTTP contract for "build" objects:
 
 HTTP layer responsibilities:
 - Parse and validate request payloads (structure + types)
-- Delegate actions to app.state.registry (source of truth)
+- Delegate actions to app.state.builds_registry (source of truth)
 - Convert registry results to response DTOs
 
 This module MUST NOT:
@@ -133,7 +133,7 @@ def http_409(reason: str) -> HTTPException:
 # Registry interface (expected)
 # =========================
 #
-# This module expects req.app.state.registry to provide:
+# This module expects req.app.state.builds_registry to provide:
 #
 #   create_build(request: dict) -> tuple[dict, bool]
 #       Returns (build_dict, created) where created:
@@ -175,7 +175,7 @@ def post_build(req: Request, body: BuildCreateIn):
         * 201 + full build object if created
         * 200 + full build object if cache hit (force_rebuild != true)
     """
-    reg = req.app.state.registry
+    reg = req.app.state.builds_registry
 
     try:
         build_dict, created = reg.create_build(body.request.model_dump())
@@ -199,7 +199,7 @@ def get_builds(req: Request):
     """
     List builds (summary only).
     """
-    reg = req.app.state.registry
+    reg = req.app.state.builds_registry
 
     try:
         items = reg.list_builds()
@@ -214,7 +214,7 @@ def get_build(req: Request, build_id: str):
     """
     Get a single build (full representation).
     """
-    reg = req.app.state.registry
+    reg = req.app.state.builds_registry
 
     try:
         b = reg.get_build(build_id)
@@ -238,7 +238,7 @@ def cancel_build(req: Request, build_id: str):
     - 404 not_found if build does not exist
     - 409 conflict if build already in a final state (done/canceled)
     """
-    reg = req.app.state.registry
+    reg = req.app.state.builds_registry
 
     try:
         ok = reg.cancel_build(build_id)
@@ -267,7 +267,7 @@ def download_build(req: Request, build_id: str):
     - 404: build/artifact not found
     - 409: build not ready (not done)
     """
-    reg = req.app.state.registry
+    reg = req.app.state.builds_registry
 
     try:
         path = reg.get_build_download(build_id)
