@@ -1,4 +1,7 @@
-"""Minimal build runner loop."""
+"""Minimal build runner loop.
+
+Consumes queued build IDs, runs them, and updates registry state.
+"""
 from __future__ import annotations
 
 import os
@@ -18,6 +21,7 @@ class Executor:
     """Stub executor for running a build."""
 
     def run(self, build: dict) -> tuple[Popen, dict]:
+        """Launch the build process and return (process, result)."""
         process = Popen(
             ["/bin/sleep", "1"],
             preexec_fn=os.setsid,
@@ -35,12 +39,14 @@ class Runner:
         runtime_dir: Path,
         executor: Executor | None = None,
     ) -> None:
+        """Create a runner with a registry, runtime dir, and executor."""
         self._registry = registry
         self._queue = BuildQueue(runtime_dir / "queue.json")
         self._lock = RunnerLock(runtime_dir)
         self._executor = executor or Executor()
 
     def recover_running_builds(self) -> None:
+        """Requeue builds that were left in running state."""
         for build in self._registry.list_builds():
             if build.get("state") != "running":
                 continue
@@ -58,6 +64,7 @@ class Runner:
             self._queue.enqueue(build_id)
 
     def _cancel_build(self, build_id: str, process: Popen | None) -> None:
+        """Terminate the process and mark the build as canceled."""
         if process is not None:
             try:
                 os.killpg(process.pid, signal.SIGTERM)
@@ -84,6 +91,7 @@ class Runner:
         )
 
     def run_forever(self) -> None:
+        """Acquire the lock and continuously process queued builds."""
         if not self._lock.acquire():
             return
         try:
