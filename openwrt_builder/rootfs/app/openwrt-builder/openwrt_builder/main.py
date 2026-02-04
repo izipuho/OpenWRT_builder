@@ -1,3 +1,4 @@
+"""FastAPI app entrypoint for OpenWRT Builder."""
 import os
 from pathlib import Path
 
