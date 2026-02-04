@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
 
-router = APIRouter(prefix="/api/v1")
+router = APIRouter(prefix="/api/v1", tags=["profiles", "lists"])
 
 @router.get("/health")
 def health():
@@ -9,13 +9,13 @@ def health():
 # Manage Profiles
 @router.get("/profiles")
 def get_profiles(req: Request):
-    return req.app.state.profiles.list()
+    return req.app.state.registry.list_profiles()
 
 @router.get("/profile/{profile_id}", status_code=200)
 def get_profile(req: Request, profile_id: str):
-    reg = req.app.state.profiles
+    reg = req.app.state.registry
     try:
-        return reg.get(profile_id)
+        return reg.get_profile(profile_id)
     except FileNotFoundError:
         raise HTTPException(
             status_code=404,
@@ -24,9 +24,9 @@ def get_profile(req: Request, profile_id: str):
 
 @router.post("/profile", status_code=201)
 def post_profile(req: Request, body: dict):
-    reg = req.app.state.profiles
+    reg = req.app.state.registry
     try:
-        return reg.create(body)
+        return reg.create_profile(body)
     except ValueError as e:
         raise HTTPException(status_code=400, detail={"code": "invalid_request", "reason": str(e)})
     except FileExistsError:
@@ -34,9 +34,9 @@ def post_profile(req: Request, body: dict):
 
 @router.put("/profile/{profile_id}", status_code=200)
 def put_profile(req: Request, profile_id: str, body: dict):
-    reg = req.app.state.profiles
+    reg = req.app.state.registry
     try:
-        return reg.create(body, profile_id, True)
+        return reg.create_profile(body, profile_id, True)
     except ValueError as e:
         raise HTTPException(
             status_code=400,
@@ -55,9 +55,9 @@ def put_profile(req: Request, profile_id: str, body: dict):
 
 @router.delete("/profile/{profile_id}", status_code=200)
 def delete_profile(req: Request, profile_id: str):
-    reg = req.app.state.profiles
+    reg = req.app.state.registry
     try:
-        return reg.delete(profile_id)
+        return reg.delete_profile(profile_id)
     except FileNotFoundError:
         raise HTTPException(
             status_code=404,
@@ -72,24 +72,24 @@ def delete_profile(req: Request, profile_id: str):
 # Manage lists
 @router.get("/lists")
 def get_lists(req: Request):
-    return req.app.state.lists.list()
+    return req.app.state.registry.list_lists()
 
 @router.get("/list/{list_id}", status_code=200)
 def get_list(req: Request, list_id: str):
-    reg = req.app.state.lists
+    reg = req.app.state.registry
     try:
-        return reg.get(list_id)
+        return reg.get_list(list_id)
     except FileNotFoundError:
         raise HTTPException(
             status_code=404,
-            detail={"code": "not_found", "reason": "profile_not_found"},
+            detail={"code": "not_found", "reason": "list_not_found"},
         )
 
 @router.post("/list", status_code=201)
 def post_list(req: Request, body: dict):
-    reg = req.app.state.lists
+    reg = req.app.state.registry
     try:
-        return reg.create(body)
+        return reg.create_list(body)
     except ValueError as e:
         raise HTTPException(status_code=400, detail={"code": "invalid_request", "reason": str(e)})
     except FileExistsError:
@@ -97,9 +97,9 @@ def post_list(req: Request, body: dict):
 
 @router.put("/list/{list_id}", status_code=200)
 def put_list(req: Request, list_id: str, body: dict):
-    reg = req.app.state.lists
+    reg = req.app.state.registry
     try:
-        return reg.create(body, list_id, True)
+        return reg.create_list(body, list_id, True)
     except ValueError as e:
         raise HTTPException(
             status_code=400,
@@ -118,9 +118,9 @@ def put_list(req: Request, list_id: str, body: dict):
 
 @router.delete("/list/{list_id}", status_code=200)
 def delete_list(req: Request, list_id: str):
-    reg = req.app.state.lists
+    reg = req.app.state.registry
     try:
-        return reg.delete(list_id)
+        return reg.delete_list(list_id)
     except FileNotFoundError:
         raise HTTPException(
             status_code=404,
