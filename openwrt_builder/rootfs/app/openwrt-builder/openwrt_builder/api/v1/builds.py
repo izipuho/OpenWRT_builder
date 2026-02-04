@@ -130,7 +130,7 @@ def http_409(reason: str) -> HTTPException:
 
 
 # =========================
-# Registry interface (expected)
+# Registry interface
 # =========================
 #
 # This module expects req.app.state.builds_registry to provide:
