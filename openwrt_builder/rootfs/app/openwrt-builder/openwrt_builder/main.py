@@ -10,12 +10,8 @@ from openwrt_builder.service.builds_registry import BuildsRegistry
 from openwrt_builder.service.profiles_registry import ListsRegistry, ProfilesRegistry
 
 app = FastAPI(title="OpenWRT Builder", version="v1")
-app.state.profiles_registry = ProfilesRegistry(
-    Path(os.environ["OPENWRT_BUILDER_PROFILES_DIR"]),
-)
-app.state.lists_registry = ListsRegistry(
-    Path(os.environ["OPENWRT_BUILDER_LISTS_DIR"]),
-)
+app.state.profiles_registry = ProfilesRegistry()
+app.state.lists_registry = ListsRegistry()
 app.state.builds_registry = BuildsRegistry(
     Path(os.environ["OPENWRT_BUILDER_BUILDS_DIR"]),
     app.state.profiles_registry,
