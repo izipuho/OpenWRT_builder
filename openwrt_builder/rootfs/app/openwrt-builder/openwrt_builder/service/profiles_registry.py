@@ -1,17 +1,20 @@
-"""Registry classes for profiles, lists, and shared file-backed helpers."""
+"""Registry helpers for profiles and lists."""
 from __future__ import annotations
+
 import json
-from pathlib import Path
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 import re
-import tempfile
 import shutil
+import tempfile
 
 _JSON_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 
+
 class BaseRegistry:
     """Shared JSON file registry for config-like objects."""
+
     def __init__(self, configs_path: Path) -> None:
         """Initialize a registry rooted at the provided configs path."""
         self._configs_path = configs_path
@@ -60,7 +63,7 @@ class BaseRegistry:
                     configs.append(
                         {
                             f"{self._config_type}_id": path.stem,
-                            **data
+                            **data,
                         }
                     )
                 except (OSError, json.JSONDecodeError):
@@ -99,7 +102,7 @@ class BaseRegistry:
 
         out = {
             "updated_at": self._now_z(),
-            **full_config
+            **full_config,
         }
 
         self._atomic_write_json(path, out)
@@ -115,8 +118,9 @@ class BaseRegistry:
         return {f"{self._config_type}_id": config_id, "deleted": True}
 
 
-class Profiles(BaseRegistry):
+class ProfilesRegistry(BaseRegistry):
     """Registry wrapper for profile configurations."""
+
     def list(self) -> list[dict]:
         """List all profiles."""
         return self.list_configs()
@@ -134,8 +138,9 @@ class Profiles(BaseRegistry):
         return self.delete_config(profile_id)
 
 
-class Lists(BaseRegistry):
+class ListsRegistry(BaseRegistry):
     """Registry wrapper for list configurations."""
+
     def list(self) -> list[dict]:
         """List all lists."""
         return self.list_configs()
