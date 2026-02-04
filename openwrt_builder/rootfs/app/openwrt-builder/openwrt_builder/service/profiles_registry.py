@@ -121,14 +121,18 @@ class BaseRegistry:
 class ProfilesRegistry(BaseRegistry):
     """Registry wrapper for profile configurations."""
 
-    def __init__(self, configs_path: Path) -> None:
+    def __init__(self, configs_path: Path | None = None) -> None:
         """Initialize a profile registry rooted at the provided configs path."""
+        if configs_path is None:
+            configs_path = Path(os.environ["OPENWRT_BUILDER_PROFILES_DIR"])
         super().__init__(configs_path)
 
 
 class ListsRegistry(BaseRegistry):
     """Registry wrapper for list configurations."""
 
-    def __init__(self, configs_path: Path) -> None:
+    def __init__(self, configs_path: Path | None = None) -> None:
         """Initialize a list registry rooted at the provided configs path."""
+        if configs_path is None:
+            configs_path = Path(os.environ["OPENWRT_BUILDER_LISTS_DIR"])
         super().__init__(configs_path)
