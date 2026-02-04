@@ -51,7 +51,7 @@ class BaseRegistry:
 
         shutil.move(tmp_name, path)
 
-    def list_configs(self) -> list[dict]:
+    def list(self) -> list[dict]:
         """Return a sorted list of all config records."""
         configs: list[dict] = []
         if self._configs_path.exists():
@@ -71,7 +71,7 @@ class BaseRegistry:
         configs.sort(key=lambda x: x["updated_at"])
         return configs
 
-    def get_config(self, config_id: str) -> dict:
+    def get(self, config_id: str) -> dict:
         """Return a single config by ID or raise FileNotFoundError."""
         path = self._configs_path / f"{config_id}.json"
         if not path.exists():
@@ -80,7 +80,7 @@ class BaseRegistry:
         with path.open("r", encoding="utf-8") as f:
             return {f"{self._config_type}_id": config_id, **json.load(f)}
 
-    def create_config(self, full_config: dict, config_id: str = None, force: bool = False) -> dict:
+    def create(self, full_config: dict, config_id: str = None, force: bool = False) -> dict:
         """Create or update a config record and return it."""
         name = full_config["name"]
         schema_version = full_config["schema_version"]
@@ -109,7 +109,7 @@ class BaseRegistry:
 
         return {f"{self._config_type}_id": config_id, **out}
 
-    def delete_config(self, config_id: str) -> bool:
+    def delete(self, config_id: str) -> bool:
         """Delete a config by ID and return deletion status."""
         path = self._configs_path / f"{config_id}.json"
         if not path.exists():
@@ -121,38 +121,14 @@ class BaseRegistry:
 class ProfilesRegistry(BaseRegistry):
     """Registry wrapper for profile configurations."""
 
-    def list(self) -> list[dict]:
-        """List all profiles."""
-        return self.list_configs()
-
-    def get(self, profile_id: str) -> dict:
-        """Return a single profile by ID."""
-        return self.get_config(profile_id)
-
-    def create(self, profile: dict, profile_id: str = None, force: bool = False) -> dict:
-        """Create or update a profile."""
-        return self.create_config(profile, profile_id, force)
-
-    def delete(self, profile_id: str) -> bool:
-        """Delete a profile by ID."""
-        return self.delete_config(profile_id)
+    def __init__(self, configs_path: Path) -> None:
+        """Initialize a profile registry rooted at the provided configs path."""
+        super().__init__(configs_path)
 
 
 class ListsRegistry(BaseRegistry):
     """Registry wrapper for list configurations."""
 
-    def list(self) -> list[dict]:
-        """List all lists."""
-        return self.list_configs()
-
-    def get(self, list_id: str) -> dict:
-        """Return a single list by ID."""
-        return self.get_config(list_id)
-
-    def create(self, list_data: dict, list_id: str = None, force: bool = False) -> dict:
-        """Create or update a list."""
-        return self.create_config(list_data, list_id, force)
-
-    def delete(self, list_id: str) -> bool:
-        """Delete a list by ID."""
-        return self.delete_config(list_id)
+    def __init__(self, configs_path: Path) -> None:
+        """Initialize a list registry rooted at the provided configs path."""
+        super().__init__(configs_path)
