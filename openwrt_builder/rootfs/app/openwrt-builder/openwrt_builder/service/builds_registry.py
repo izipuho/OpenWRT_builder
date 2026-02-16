@@ -18,7 +18,7 @@ class BuildsRegistry:
     profile identifiers before creating builds.
     """
 
-    def __init__(self, builds_path: Path, profiles: ProfilesRegistry) -> None:
+    def __init__(self, builds_path: Path, profiles: ProfilesRegistry, queue: BuildQueue) -> None:
         """Initialize the registry and ensure the build directory exists.
 
         Args:
@@ -29,7 +29,7 @@ class BuildsRegistry:
         self._builds_path.mkdir(parents=True, exist_ok=True)
         self._profiles = profiles
         runtime_dir = os.environ.get("OPENWRT_BUILDER_RUNTIME_DIR")
-        self._queue: BuildQueue | None = None
+        self._queue = queue
         if runtime_dir:
             self._queue = BuildQueue(Path(runtime_dir) / "queue.json")
 

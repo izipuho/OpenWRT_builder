@@ -1,0 +1,8 @@
+#!/command/with-contenv sh
+set -eu
+
+set -a
+. /etc/openwrt-builder/paths.env
+set +a
+
+exec python3 -m openwrt_builder.runner.main

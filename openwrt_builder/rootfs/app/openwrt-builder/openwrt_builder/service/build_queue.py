@@ -1,7 +1,4 @@
-"""Persistent queue for build IDs.
-
-Stores the queue on disk as JSON to survive process restarts.
-"""
+"""Persistent FIFO queue for build IDs."""
 from __future__ import annotations
 
 import json
@@ -11,65 +8,69 @@ from openwrt_builder.service.profiles_registry import BaseRegistry
 
 
 class BuildQueue:
-    """File-backed queue with simple list semantics.
+    """File-backed FIFO queue for build identifiers."""
 
-    Each operation reads the JSON payload, mutates the list of build IDs,
-    and writes it back atomically.
-    """
-
-    def __init__(self, path: Path) -> None:
-        """Create a queue bound to the given JSON file path."""
-        self._path = path
+    def __init__(self, queue_path: Path) -> None:
+        self._path = queue_path
         self._path.parent.mkdir(parents=True, exist_ok=True)
+        if not self._path.exists():
+            self._write({"items": [], "updated_at": BaseRegistry._now_z()})
 
     def _read(self) -> dict:
-        """Load the current queue payload, initializing defaults if missing."""
-        if not self._path.exists():
-            return {"items": [], "updated_at": BaseRegistry._now_z()}
-        with self._path.open("r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with self._path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+        except FileNotFoundError:
+            data = {"items": [], "updated_at": BaseRegistry._now_z()}
+        if not isinstance(data, dict):
+            data = {"items": [], "updated_at": BaseRegistry._now_z()}
+        items = data.get("items")
+        if not isinstance(items, list):
+            items = []
+        data["items"] = [x for x in items if isinstance(x, str) and x]
+        if not isinstance(data.get("updated_at"), str):
+            data["updated_at"] = BaseRegistry._now_z()
+        return data
 
-    def _write(self, payload: dict) -> None:
-        """Persist the queue payload atomically."""
-        BaseRegistry._atomic_write_json(self._path, payload)
+    def _write(self, data: dict) -> None:
+        data["updated_at"] = BaseRegistry._now_z()
+        BaseRegistry._atomic_write_json(self._path, data)
+
+    def list(self) -> list[str]:
+        """Return current queued build IDs (FIFO order)."""
+        return list(self._read()["items"])
 
     def enqueue(self, build_id: str) -> bool:
-        """Add a build ID to the queue if not already present."""
+        """Enqueue build_id if not already present. Returns True if added."""
+        if not isinstance(build_id, str) or not build_id:
+            raise ValueError("build_id")
         data = self._read()
-        items = list(data.get("items") or [])
+        items: list[str] = data["items"]
         if build_id in items:
             return False
         items.append(build_id)
-        data["items"] = items
-        data["updated_at"] = BaseRegistry._now_z()
         self._write(data)
         return True
 
     def dequeue(self) -> str | None:
-        """Pop the next build ID or return None when empty."""
+        """Dequeue next build_id (FIFO). Returns None if empty."""
         data = self._read()
-        items = list(data.get("items") or [])
+        items: list[str] = data["items"]
         if not items:
             return None
         build_id = items.pop(0)
-        data["items"] = items
-        data["updated_at"] = BaseRegistry._now_z()
         self._write(data)
         return build_id
 
     def remove(self, build_id: str) -> bool:
-        """Remove a build ID from the queue if it exists."""
+        """Remove build_id from queue. Returns True if removed."""
+        if not isinstance(build_id, str) or not build_id:
+            raise ValueError("build_id")
         data = self._read()
-        items = list(data.get("items") or [])
-        if build_id not in items:
-            return False
-        items = [item for item in items if item != build_id]
-        data["items"] = items
-        data["updated_at"] = BaseRegistry._now_z()
-        self._write(data)
-        return True
-
-    def list(self) -> list[str]:
-        """Return the current queued build IDs in order."""
-        data = self._read()
-        return list(data.get("items") or [])
+        items: list[str] = data["items"]
+        before = len(items)
+        items[:] = [x for x in items if x != build_id]
+        removed = len(items) != before
+        if removed:
+            self._write(data)
+        return removed
