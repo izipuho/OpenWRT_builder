@@ -36,10 +36,12 @@ class RunnerLock:
     """Single-runner lock (fcntl)."""
 
     def __init__(self, lock_path: Path) -> None:
+        """Initialize lock manager for the given lock file path."""
         self._lock_path = lock_path
         self._fp = None
 
     def __enter__(self) -> "RunnerLock":
+        """Acquire exclusive non-blocking file lock and write current PID."""
         self._lock_path.parent.mkdir(parents=True, exist_ok=True)
         fp = self._lock_path.open("a+", encoding="utf-8")
         try:
@@ -55,6 +57,7 @@ class RunnerLock:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
+        """Release lock file descriptor if it was acquired."""
         if self._fp is not None:
             try:
                 fcntl.flock(self._fp.fileno(), fcntl.LOCK_UN)
@@ -85,9 +88,11 @@ class BuildRunner:
         self._executor = executor
 
     def _build_path(self, build_id: str) -> Path:
+        """Return JSON metadata path for a build identifier."""
         return self._cfg.builds_dir / f"{build_id}.json"
 
     def _read_build(self, build_id: str) -> dict:
+        """Read and deserialize build metadata for a build identifier."""
         path = self._build_path(build_id)
         if not path.exists():
             raise FileNotFoundError(build_id)
@@ -95,6 +100,7 @@ class BuildRunner:
             return json.load(f)
 
     def _write_build(self, build_id: str, payload: dict) -> None:
+        """Persist build metadata atomically."""
         BaseRegistry._atomic_write_json(self._build_path(build_id), payload)
 
     def _set_state(
@@ -107,6 +113,7 @@ class BuildRunner:
         result: dict | None = None,
         runner_pid: int | None | object = None,
     ) -> dict:
+        """Apply partial build state changes and refresh update timestamp."""
         if state is not None:
             build["state"] = state
         if progress is not None:

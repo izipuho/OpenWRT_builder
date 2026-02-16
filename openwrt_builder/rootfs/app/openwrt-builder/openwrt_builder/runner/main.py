@@ -8,6 +8,7 @@ from openwrt_builder.service.build_queue import BuildQueue
 
 
 def main() -> None:
+    """Start the build runner with environment-based configuration."""
     builds_dir = env_path("OPENWRT_BUILDER_BUILDS_DIR")
     runtime_dir = env_path("OPENWRT_BUILDER_RUNTIME_DIR")
 

@@ -11,12 +11,14 @@ class BuildQueue:
     """File-backed FIFO queue for build identifiers."""
 
     def __init__(self, queue_path: Path) -> None:
+        """Initialize queue storage and create an empty queue file if needed."""
         self._path = queue_path
         self._path.parent.mkdir(parents=True, exist_ok=True)
         if not self._path.exists():
             self._write({"items": [], "updated_at": BaseRegistry._now_z()})
 
     def _read(self) -> dict:
+        """Load queue payload from disk and normalize malformed content."""
         try:
             with self._path.open("r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -33,6 +35,7 @@ class BuildQueue:
         return data
 
     def _write(self, data: dict) -> None:
+        """Atomically write queue payload with refreshed update timestamp."""
         data["updated_at"] = BaseRegistry._now_z()
         BaseRegistry._atomic_write_json(self._path, data)
 
