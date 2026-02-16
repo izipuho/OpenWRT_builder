@@ -9,6 +9,8 @@ import re
 import shutil
 import tempfile
 
+from openwrt_builder.env import env_path
+
 _JSON_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 
 
@@ -124,7 +126,7 @@ class ProfilesRegistry(BaseRegistry):
     def __init__(self, configs_path: Path | None = None) -> None:
         """Initialize a profile registry rooted at the provided configs path."""
         if configs_path is None:
-            configs_path = Path(os.environ["OPENWRT_BUILDER_PROFILES_DIR"])
+            configs_path = env_path("OPENWRT_BUILDER_PROFILES_DIR")
         super().__init__(configs_path)
 
 
@@ -134,5 +136,5 @@ class ListsRegistry(BaseRegistry):
     def __init__(self, configs_path: Path | None = None) -> None:
         """Initialize a list registry rooted at the provided configs path."""
         if configs_path is None:
-            configs_path = Path(os.environ["OPENWRT_BUILDER_LISTS_DIR"])
+            configs_path = env_path("OPENWRT_BUILDER_LISTS_DIR")
         super().__init__(configs_path)

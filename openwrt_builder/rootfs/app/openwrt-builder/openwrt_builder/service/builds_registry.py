@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 from openwrt_builder.service.build_queue import BuildQueue
@@ -28,10 +27,7 @@ class BuildsRegistry:
         self._builds_path = builds_path
         self._builds_path.mkdir(parents=True, exist_ok=True)
         self._profiles = profiles
-        runtime_dir = os.environ.get("OPENWRT_BUILDER_RUNTIME_DIR")
         self._queue = queue
-        if runtime_dir:
-            self._queue = BuildQueue(Path(runtime_dir) / "queue.json")
 
     def _build_path(self, build_id: str) -> Path:
         """Return the path for a build JSON file by ID."""
