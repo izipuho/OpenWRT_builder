@@ -9,10 +9,12 @@ class StubExecutor:
     """Fake build executor producing a dummy artifact file."""
 
     def __init__(self, builds_dir: Path) -> None:
+        """Store builds directory and ensure it exists."""
         self._builds_dir = builds_dir
         self._builds_dir.mkdir(parents=True, exist_ok=True)
 
     def __call__(self, build: dict) -> dict:
+        """Simulate a build and return the produced artifact path."""
         build_id = str(build["build_id"])
         time.sleep(2.0)
 
