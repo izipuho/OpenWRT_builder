@@ -1,0 +1,79 @@
+/* app.css */
+
+body {
+    font-family: system-ui, sans-serif;
+    margin: 0;
+}
+
+header {
+    padding: 12px 16px;
+    border-bottom: 1px solid #ddd;
+}
+
+nav {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.tab {
+    padding: 6px 10px;
+}
+
+.tab.active {
+    font-weight: 700;
+}
+
+main {
+    padding: 16px;
+}
+
+.hidden {
+    display: none;
+}
+
+.toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+th,
+td {
+    border: 1px solid #ddd;
+    padding: 6px 8px;
+    text-align: left;
+}
+
+.actions {
+    white-space: nowrap;
+}
+
+.editor {
+    margin-top: 16px;
+    padding: 12px;
+    border: 1px solid #ddd;
+}
+
+.row {
+    margin: 8px 0;
+    display: grid;
+    gap: 6px;
+}
+
+input,
+textarea {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.error {
+    background: #fff3f3;
+    border: 1px solid #f0b4b4;
+    padding: 8px;
+}
