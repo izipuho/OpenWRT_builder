@@ -189,7 +189,11 @@ def post_build(req: Request, body: BuildCreateIn):
     except Exception as e:
         raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": str(e)})
 
-    model = BuildOut.model_validate(build_dict)
+    try:
+        model = BuildOut.model_validate(build_dict)
+    except ValidationError as e:
+        raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": f"invalid_build_payload: {e}"})
+
     return JSONResponse(
         status_code=201 if created else 200,
         content=model.model_dump(mode="json"),
@@ -233,7 +237,10 @@ def get_build(req: Request, build_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": str(e)})
 
-    return BuildOut.model_validate(b)
+    try:
+        return BuildOut.model_validate(b)
+    except ValidationError as e:
+        raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": f"invalid_build_payload: {e}"})
 
 
 @router.post("/build/{build_id}/cancel", response_model=CancelOut)
