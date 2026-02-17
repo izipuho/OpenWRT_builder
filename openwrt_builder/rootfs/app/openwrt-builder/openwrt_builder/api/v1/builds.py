@@ -26,7 +26,7 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 
 router = APIRouter(prefix="/api/v1", tags=["builds"])
@@ -189,7 +189,11 @@ def post_build(req: Request, body: BuildCreateIn):
     except Exception as e:
         raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": str(e)})
 
-    model = BuildOut.model_validate(build_dict)
+    try:
+        model = BuildOut.model_validate(build_dict)
+    except ValidationError as e:
+        raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": f"invalid_build_payload: {e}"})
+
     return JSONResponse(
         status_code=201 if created else 200,
         content=model.model_dump(mode="json"),
@@ -208,7 +212,13 @@ def get_builds(req: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": str(e)})
 
-    return [BuildSummaryOut.model_validate(x) for x in items]
+    summaries: list[BuildSummaryOut] = []
+    for item in items:
+        try:
+            summaries.append(BuildSummaryOut.model_validate(item))
+        except ValidationError:
+            continue
+    return summaries
 
 
 @router.get("/build/{build_id}", response_model=BuildOut)
@@ -227,7 +237,10 @@ def get_build(req: Request, build_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": str(e)})
 
-    return BuildOut.model_validate(b)
+    try:
+        return BuildOut.model_validate(b)
+    except ValidationError as e:
+        raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": f"invalid_build_payload: {e}"})
 
 
 @router.post("/build/{build_id}/cancel", response_model=CancelOut)
