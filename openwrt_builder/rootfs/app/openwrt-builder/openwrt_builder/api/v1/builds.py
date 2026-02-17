@@ -26,7 +26,7 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 
 router = APIRouter(prefix="/api/v1", tags=["builds"])
@@ -208,7 +208,13 @@ def get_builds(req: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": str(e)})
 
-    return [BuildSummaryOut.model_validate(x) for x in items]
+    summaries: list[BuildSummaryOut] = []
+    for item in items:
+        try:
+            summaries.append(BuildSummaryOut.model_validate(item))
+        except ValidationError:
+            continue
+    return summaries
 
 
 @router.get("/build/{build_id}", response_model=BuildOut)
