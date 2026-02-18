@@ -30,6 +30,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.mount("/static", StaticFiles(directory="/ingress/static"), name="static")
+app.mount("/examples", StaticFiles(directory="/usr/share/openwrt-builder/examples"), name="examples")
 app.include_router(profiles_router)
 app.include_router(builds_router)
 app.include_router(ui_router)

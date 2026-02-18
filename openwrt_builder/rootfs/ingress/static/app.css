@@ -121,6 +121,65 @@ textarea {
     gap: 8px;
 }
 
+.checklist {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    max-height: 260px;
+    overflow: auto;
+}
+
+.checkitem {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: start;
+    gap: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    background: #fafafa;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.checkitem input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+.checkitem:has(input[type="checkbox"]:checked) {
+    background: #e9f6ee;
+    border-color: #59a06c;
+}
+
+.checktext {
+    display: grid;
+    gap: 2px;
+}
+
+.checktitle {
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.checkmeta {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.2;
+}
+
+.muted {
+    color: var(--muted);
+    font-size: 13px;
+}
+
 .error {
     margin: 10px 0 0 0;
     padding: 10px;

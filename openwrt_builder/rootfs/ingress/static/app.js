@@ -1,4 +1,5 @@
 const API = "http://10.8.25.110:8080/api/v1";
+const API_BASE = API.replace(/\/api\/v1\/?$/, "");
 
 const el = (id) => document.getElementById(id);
 
@@ -33,6 +34,47 @@ async function apiJson(path, opts = {}) {
 
 /* ---------------- Lists ---------------- */
 
+let listTemplateCache = null;
+
+function normalizeListTemplate(obj = {}) {
+    const list = obj.list || {};
+    return {
+        name: typeof obj.name === "string" && obj.name.trim() ? obj.name : "New list",
+        schema_version: Number(obj.schema_version) || 1,
+        list: {
+            include: Array.isArray(list.include) ? list.include.map(String) : [],
+            exclude: Array.isArray(list.exclude) ? list.exclude.map(String) : [],
+        },
+    };
+}
+
+async function getListTemplate() {
+    if (listTemplateCache) return listTemplateCache;
+    try {
+        const res = await fetch(`${API_BASE}/examples/list.json`);
+        if (!res.ok) throw new Error(`template_http_${res.status}`);
+        listTemplateCache = normalizeListTemplate(await res.json());
+    } catch (_) {
+        listTemplateCache = normalizeListTemplate({
+            name: "New list",
+            schema_version: 1,
+            list: { include: [], exclude: [] },
+        });
+    }
+    return listTemplateCache;
+}
+
+function arrayToLines(items) {
+    return (items || []).map((v) => String(v)).join("\n");
+}
+
+function linesToArray(text) {
+    return String(text || "")
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean);
+}
+
 function renderListsTable(rows) {
     const html = `
     <table>
@@ -40,17 +82,20 @@ function renderListsTable(rows) {
         <tr><th>id</th><th>name</th><th>updated_at</th><th></th></tr>
       </thead>
       <tbody>
-        ${rows.map((r) => `
+        ${rows.map((r) => {
+        const id = r.list_id ?? r.id ?? "";
+        return `
           <tr>
-            <td>${escapeHtml(r.id)}</td>
+            <td>${escapeHtml(id)}</td>
             <td>${escapeHtml(r.name ?? "")}</td>
             <td>${escapeHtml(r.updated_at ?? "")}</td>
             <td class="actions">
-              <button type="button" data-act="edit" data-id="${escapeAttr(r.id)}">Edit</button>
-              <button type="button" data-act="del" data-id="${escapeAttr(r.id)}">Delete</button>
+              <button type="button" data-act="edit" data-id="${escapeAttr(id)}">Edit</button>
+              <button type="button" data-act="del" data-id="${escapeAttr(id)}">Delete</button>
             </td>
           </tr>
-        `).join("")}
+        `;
+    }).join("")}
       </tbody>
     </table>
   `;
@@ -81,16 +126,22 @@ function hideListsEditor() {
     el("lists-editor").innerHTML = "";
 }
 
-function listEditorHtml(id, name, content) {
+function listEditorHtml(id, model) {
+    const includeText = arrayToLines(model?.list?.include);
+    const excludeText = arrayToLines(model?.list?.exclude);
+    const schemaVersion = Number(model?.schema_version) || 1;
+    const name = model?.name || "";
     return `
     <h2>${id ? "Edit list" : "Create list"}</h2>
     ${id ? `
       <div class="row"><label>id</label><input id="list-id" value="${escapeAttr(id)}" disabled /></div>
     ` : `
-      <div class="row"><label>id (optional)</label><input id="list-id" placeholder="slug" /></div>
+      <div class="row"><label>list_id (optional)</label><input id="list-id" placeholder="slug" /></div>
     `}
     <div class="row"><label>name</label><input id="list-name" value="${escapeAttr(name)}" /></div>
-    <div class="row"><label>content</label><textarea id="list-content" rows="12">${escapeHtml(content)}</textarea></div>
+    <div class="row"><label>include (one per line)</label><textarea id="list-include" rows="8">${escapeHtml(includeText)}</textarea></div>
+    <div class="row"><label>exclude (one per line)</label><textarea id="list-exclude" rows="8">${escapeHtml(excludeText)}</textarea></div>
+    <input id="list-schema-version" type="hidden" value="${escapeAttr(schemaVersion)}" />
     <div class="row buttons">
       <button id="list-save" type="button">Save</button>
       <button id="list-cancel" type="button">Cancel</button>
@@ -102,10 +153,11 @@ function listEditorHtml(id, name, content) {
 async function openListEditor(id = null) {
     if (id) {
         const obj = await apiJson(`${API}/list/${encodeURIComponent(id)}`);
-        showListsEditor(listEditorHtml(obj.id, obj.name ?? "", obj.content ?? ""));
-        wireListEditor(obj.id);
+        showListsEditor(listEditorHtml(id, obj));
+        wireListEditor(id);
     } else {
-        showListsEditor(listEditorHtml("", "", ""));
+        const tpl = await getListTemplate();
+        showListsEditor(listEditorHtml("", tpl));
         wireListEditor(null);
     }
 }
@@ -118,17 +170,27 @@ function wireListEditor(existingId) {
             el("list-error").classList.add("hidden");
             const id = el("list-id").value.trim();
             const name = el("list-name").value.trim();
-            const content = el("list-content").value;
+            const schemaVersion = Number(el("list-schema-version").value) || 1;
+            const include = linesToArray(el("list-include").value);
+            const exclude = linesToArray(el("list-exclude").value);
+            const body = {
+                name,
+                schema_version: schemaVersion,
+                list: {
+                    include,
+                    exclude,
+                },
+            };
 
             if (existingId) {
                 await apiJson(`${API}/list/${encodeURIComponent(existingId)}`, {
                     method: "PUT",
-                    body: JSON.stringify({ name, content }),
+                    body: JSON.stringify(body),
                 });
             } else {
                 await apiJson(`${API}/list`, {
                     method: "POST",
-                    body: JSON.stringify({ id: id || undefined, name, content }),
+                    body: JSON.stringify({ list_id: id || undefined, ...body }),
                 });
             }
 
@@ -147,6 +209,77 @@ async function deleteList(id) {
 }
 
 /* ---------------- Profiles ---------------- */
+
+let profileTemplateCache = null;
+
+function normalizeProfileTemplate(obj = {}) {
+    const profile = obj.profile || {};
+    return {
+        name: typeof obj.name === "string" && obj.name.trim() ? obj.name : "New profile",
+        schema_version: Number(obj.schema_version) || 1,
+        profile: {
+            lists: Array.isArray(profile.lists) ? profile.lists.map(String) : [],
+            extra_include: Array.isArray(profile.extra_include) ? profile.extra_include.map(String) : [],
+            extra_exclude: Array.isArray(profile.extra_exclude) ? profile.extra_exclude.map(String) : [],
+            files: Array.isArray(profile.files) ? profile.files.map(String) : [],
+        },
+    };
+}
+
+async function getProfileTemplate() {
+    if (profileTemplateCache) return profileTemplateCache;
+    try {
+        const res = await fetch(`${API_BASE}/examples/profile.json`);
+        if (!res.ok) throw new Error(`template_http_${res.status}`);
+        profileTemplateCache = normalizeProfileTemplate(await res.json());
+    } catch (_) {
+        profileTemplateCache = normalizeProfileTemplate({
+            name: "New profile",
+            schema_version: 1,
+            profile: { lists: [], extra_include: [], extra_exclude: [], files: [] },
+        });
+    }
+    return profileTemplateCache;
+}
+
+async function getListChoices() {
+    const rows = await apiJson(`${API}/lists`);
+    return rows
+        .map((r) => {
+            const id = String(r.list_id ?? r.id ?? "").trim();
+            const name = String(r.name || "").trim();
+            if (!id || !name) return null;
+            return {
+                id,
+                title: name,
+                meta: id,
+            };
+        })
+        .filter(Boolean);
+}
+
+function checkedValues(group) {
+    return Array.from(document.querySelectorAll(`input[data-group="${group}"]:checked`))
+        .map((elx) => elx.value);
+}
+
+function checklistHtml(group, options, selected) {
+    if (!options.length) return `<div class="muted">No lists available</div>`;
+    const selectedSet = new Set(selected || []);
+    return `
+      <div class="checklist">
+        ${options.map((o) => `
+          <label class="checkitem">
+            <input type="checkbox" data-group="${escapeAttr(group)}" value="${escapeAttr(o.id)}" ${selectedSet.has(o.id) ? "checked" : ""} />
+            <span class="checktext">
+              <span class="checktitle">${escapeHtml(o.title)}</span>
+              ${o.meta ? `<span class="checkmeta">${escapeHtml(o.meta)}</span>` : ""}
+            </span>
+          </label>
+        `).join("")}
+      </div>
+    `;
+}
 
 function renderProfilesTable(rows) {
     const html = `
@@ -200,28 +333,28 @@ function hideProfilesEditor() {
     el("profiles-editor").innerHTML = "";
 }
 
-function defaultProfileJson() {
-    return JSON.stringify(
-        {
-            name: "New profile",
-            schema_version: 1,
-            updated_at: new Date().toISOString(),
-            profile: { lists: [], extra_include: [], extra_exclude: [] },
-        },
-        null,
-        2
-    );
-}
+function profileEditorHtml(id, model, listOptions) {
+    const profile = model?.profile || {};
+    const selectedLists = Array.isArray(profile.lists) ? profile.lists : [];
+    const includeText = arrayToLines(Array.isArray(profile.extra_include) ? profile.extra_include : []);
+    const excludeText = arrayToLines(Array.isArray(profile.extra_exclude) ? profile.extra_exclude : []);
+    const filesText = arrayToLines(Array.isArray(profile.files) ? profile.files : []);
+    const schemaVersion = Number(model?.schema_version) || 1;
+    const name = model?.name || "";
 
-function profileEditorHtml(id, jsonText) {
     return `
-    <h2>${id ? "Edit profile (full replace)" : "Create profile"}</h2>
+    <h2>${id ? "Edit profile" : "Create profile"}</h2>
     ${id ? `
       <div class="row"><label>id</label><input id="profile-id" value="${escapeAttr(id)}" disabled /></div>
     ` : `
       <div class="row"><label>profile_id (optional)</label><input id="profile-id" placeholder="slug" /></div>
     `}
-    <div class="row"><label>json</label><textarea id="profile-json" rows="16">${escapeHtml(jsonText)}</textarea></div>
+    <div class="row"><label>name</label><input id="profile-name" value="${escapeAttr(name)}" /></div>
+    <div class="row"><label>lists</label>${checklistHtml("profile-lists", listOptions, selectedLists)}</div>
+    <div class="row"><label>include (one per line)</label><textarea id="profile-include" rows="8">${escapeHtml(includeText)}</textarea></div>
+    <div class="row"><label>exclude (one per line)</label><textarea id="profile-exclude" rows="8">${escapeHtml(excludeText)}</textarea></div>
+    <div class="row"><label>files (one per line)</label><textarea id="profile-files" rows="6">${escapeHtml(filesText)}</textarea></div>
+    <input id="profile-schema-version" type="hidden" value="${escapeAttr(schemaVersion)}" />
     <div class="row buttons">
       <button id="profile-save" type="button">Save</button>
       <button id="profile-cancel" type="button">Cancel</button>
@@ -231,12 +364,15 @@ function profileEditorHtml(id, jsonText) {
 }
 
 async function openProfileEditor(id = null) {
+    const listOptions = await getListChoices();
     if (id) {
         const obj = await apiJson(`${API}/profile/${encodeURIComponent(id)}`);
-        showProfilesEditor(profileEditorHtml(id, JSON.stringify(obj, null, 2)));
+        const model = normalizeProfileTemplate(obj);
+        showProfilesEditor(profileEditorHtml(id, model, listOptions));
         wireProfileEditor(id);
     } else {
-        showProfilesEditor(profileEditorHtml("", defaultProfileJson()));
+        const model = await getProfileTemplate();
+        showProfilesEditor(profileEditorHtml("", model, listOptions));
         wireProfileEditor(null);
     }
 }
@@ -248,8 +384,22 @@ function wireProfileEditor(existingId) {
         try {
             el("profile-error").classList.add("hidden");
             const id = el("profile-id").value.trim();
-            const txt = el("profile-json").value;
-            const body = JSON.parse(txt);
+            const name = el("profile-name").value.trim();
+            const schemaVersion = Number(el("profile-schema-version").value) || 1;
+            const lists = checkedValues("profile-lists");
+            const include = linesToArray(el("profile-include").value);
+            const exclude = linesToArray(el("profile-exclude").value);
+            const files = linesToArray(el("profile-files").value);
+            const body = {
+                name,
+                schema_version: schemaVersion,
+                profile: {
+                    lists,
+                    extra_include: include,
+                    extra_exclude: exclude,
+                    files,
+                },
+            };
 
             if (existingId) {
                 await apiJson(`${API}/profile/${encodeURIComponent(existingId)}`, {
