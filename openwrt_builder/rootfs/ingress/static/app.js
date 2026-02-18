@@ -87,20 +87,61 @@ function linesToArray(text) {
         .filter(Boolean);
 }
 
+function timestampToMs(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return Number.NaN;
+    return Date.parse(raw);
+}
+
+function formatDateTime(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    const ts = timestampToMs(raw);
+    if (Number.isNaN(ts)) return raw;
+    return new Intl.DateTimeFormat(undefined, {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+    }).format(new Date(ts));
+}
+
+function renderUpdatedAtCell(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    const ts = timestampToMs(raw);
+    const sortTs = Number.isNaN(ts) ? "" : String(ts);
+    return `<time datetime="${escapeAttr(raw)}" data-sort-ts="${escapeAttr(sortTs)}">${escapeHtml(formatDateTime(raw))}</time>`;
+}
+
+function sortByUpdatedAtDesc(rows) {
+    return [...(rows || [])].sort((a, b) => {
+        const aTs = timestampToMs(a?.updated_at);
+        const bTs = timestampToMs(b?.updated_at);
+        if (!Number.isNaN(aTs) && !Number.isNaN(bTs)) return bTs - aTs;
+        if (!Number.isNaN(aTs)) return -1;
+        if (!Number.isNaN(bTs)) return 1;
+        return String(b?.updated_at || "").localeCompare(String(a?.updated_at || ""));
+    });
+}
+
 function renderListsTable(rows) {
+    const sortedRows = sortByUpdatedAtDesc(rows);
     const html = `
     <table>
       <thead>
         <tr><th>id</th><th>name</th><th>updated_at</th><th></th></tr>
       </thead>
       <tbody>
-        ${rows.map((r) => {
+        ${sortedRows.map((r) => {
         const id = r.list_id ?? r.id ?? "";
         return `
           <tr>
             <td>${escapeHtml(id)}</td>
             <td>${escapeHtml(r.name ?? "")}</td>
-            <td>${escapeHtml(r.updated_at ?? "")}</td>
+            <td>${renderUpdatedAtCell(r.updated_at)}</td>
             <td class="actions">
               <button type="button" data-act="edit" data-id="${escapeAttr(id)}">Edit</button>
               <button type="button" data-act="del" data-id="${escapeAttr(id)}">Delete</button>
@@ -345,19 +386,20 @@ function checklistHtml(group, options, selected, emptyText = "No items available
 }
 
 function renderProfilesTable(rows) {
+    const sortedRows = sortByUpdatedAtDesc(rows);
     const html = `
     <table>
       <thead>
         <tr><th>id</th><th>name</th><th>updated_at</th><th></th></tr>
       </thead>
       <tbody>
-        ${rows.map((r) => {
+        ${sortedRows.map((r) => {
         const id = r.profile_id ?? r.id ?? "";
         return `
             <tr>
               <td>${escapeHtml(id)}</td>
               <td>${escapeHtml(r.name ?? "")}</td>
-              <td>${escapeHtml(r.updated_at ?? "")}</td>
+              <td>${renderUpdatedAtCell(r.updated_at)}</td>
               <td class="actions">
                 <button type="button" data-act="edit" data-id="${escapeAttr(id)}">Edit</button>
                 <button type="button" data-act="del" data-id="${escapeAttr(id)}">Delete</button>
@@ -563,13 +605,14 @@ function renderBuildVersionOptions(payload = {}) {
 }
 
 function renderBuildsTable(rows) {
+    const sortedRows = sortByUpdatedAtDesc(rows);
     const html = `
     <table>
       <thead>
         <tr><th>build_id</th><th>state</th><th>progress</th><th>updated_at</th><th>message</th><th></th></tr>
       </thead>
       <tbody>
-        ${(rows || []).map((r) => {
+        ${sortedRows.map((r) => {
         const buildId = String(r.build_id || "");
         const state = String(r.state || "");
         const canStop = state === "running" && !r.cancel_requested;
@@ -580,7 +623,7 @@ function renderBuildsTable(rows) {
             <td>${escapeHtml(buildId)}</td>
             <td>${escapeHtml(state)}</td>
             <td>${escapeHtml(String(r.progress ?? ""))}%</td>
-            <td>${escapeHtml(r.updated_at ?? "")}</td>
+            <td>${renderUpdatedAtCell(r.updated_at)}</td>
             <td>${escapeHtml(r.message ?? "")}</td>
             <td class="actions">
               ${canStop ? `<button type="button" data-act="stop" data-id="${escapeAttr(buildId)}">Stop</button>` : ""}
@@ -681,17 +724,18 @@ function showFilesError(err = "") {
 }
 
 function renderFilesTable(rows) {
+    const sortedRows = sortByUpdatedAtDesc(rows);
     const html = `
     <table>
       <thead>
         <tr><th>path</th><th>size</th><th>updated_at</th><th></th></tr>
       </thead>
       <tbody>
-        ${rows.map((r) => `
+        ${sortedRows.map((r) => `
           <tr>
             <td>${escapeHtml(r.path ?? "")}</td>
             <td>${escapeHtml(String(r.size ?? ""))}</td>
-            <td>${escapeHtml(r.updated_at ?? "")}</td>
+            <td>${renderUpdatedAtCell(r.updated_at)}</td>
             <td class="actions">
               <button type="button" data-act="del" data-path="${escapeAttr(r.path ?? "")}">Delete</button>
             </td>
