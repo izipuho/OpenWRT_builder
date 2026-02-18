@@ -490,7 +490,8 @@ function renderBuildsTable(rows) {
         ${(rows || []).map((r) => {
         const buildId = String(r.build_id || "");
         const state = String(r.state || "");
-        const canCancel = (state === "queued" || state === "running") && !r.cancel_requested;
+        const canStop = state === "running" && !r.cancel_requested;
+        const canDelete = state !== "running";
         const canDownload = state === "done";
         return `
           <tr>
@@ -500,7 +501,8 @@ function renderBuildsTable(rows) {
             <td>${escapeHtml(r.updated_at ?? "")}</td>
             <td>${escapeHtml(r.message ?? "")}</td>
             <td class="actions">
-              ${canCancel ? `<button type="button" data-act="cancel" data-id="${escapeAttr(buildId)}">Cancel</button>` : ""}
+              ${canStop ? `<button type="button" data-act="stop" data-id="${escapeAttr(buildId)}">Stop</button>` : ""}
+              ${canDelete ? `<button type="button" data-act="delete" data-id="${escapeAttr(buildId)}">Delete</button>` : ""}
               ${canDownload ? `<button type="button" data-act="download" data-id="${escapeAttr(buildId)}">Download</button>` : ""}
             </td>
           </tr>
@@ -515,8 +517,10 @@ function renderBuildsTable(rows) {
         b.addEventListener("click", async () => {
             const buildId = b.getAttribute("data-id");
             const act = b.getAttribute("data-act");
-            if (act === "cancel") {
+            if (act === "stop") {
                 await cancelBuild(buildId);
+            } else if (act === "delete") {
+                await deleteBuild(buildId);
             } else if (act === "download") {
                 window.open(`${API}/build/${encodeURIComponent(buildId)}/download`, "_blank");
             }
@@ -575,6 +579,12 @@ async function createBuild() {
 async function cancelBuild(buildId) {
     showBuildsError("");
     await apiJson(`${API}/build/${encodeURIComponent(buildId)}/cancel`, { method: "POST" });
+    await refreshBuilds();
+}
+
+async function deleteBuild(buildId) {
+    showBuildsError("");
+    await apiJson(`${API}/build/${encodeURIComponent(buildId)}`, { method: "DELETE" });
     await refreshBuilds();
 }
 

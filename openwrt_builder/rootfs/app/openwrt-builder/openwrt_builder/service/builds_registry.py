@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 from openwrt_builder.service.build_queue import BuildQueue
@@ -202,3 +203,31 @@ class BuildsRegistry:
         if not Path(path).exists():
             raise FileNotFoundError(build_id)
         return path
+
+    def delete_build(self, build_id: str) -> bool:
+        """Delete build metadata and produced artifacts.
+
+        Running builds cannot be deleted directly and must be canceled first.
+        """
+        build = self._read_build(build_id)
+        if build.get("state") == "running":
+            raise PermissionError(build_id)
+
+        if self._queue is not None:
+            self._queue.remove(build_id)
+
+        result = build.get("result") or {}
+        artifact_path = result.get("path")
+        if isinstance(artifact_path, str) and artifact_path:
+            artifact = Path(artifact_path)
+            if artifact.exists():
+                try:
+                    artifact.unlink()
+                except OSError:
+                    pass
+            artifact_dir = artifact.parent
+            if artifact_dir.name == build_id and artifact_dir.exists():
+                shutil.rmtree(artifact_dir, ignore_errors=True)
+
+        self._build_path(build_id).unlink()
+        return True

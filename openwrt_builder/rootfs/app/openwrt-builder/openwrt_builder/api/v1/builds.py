@@ -6,6 +6,7 @@ This module defines the HTTP contract for "build" objects:
 - GET  /api/v1/builds
 - GET  /api/v1/build/{id}
 - POST /api/v1/build/{id}/cancel
+- DELETE /api/v1/build/{id}
 - GET  /api/v1/build/{id}/download
 
 HTTP layer responsibilities:
@@ -154,6 +155,11 @@ def http_409(reason: str) -> HTTPException:
 #       Returns False (or raises) if already final.
 #       Raises FileNotFoundError if not found.
 #
+#   delete_build(build_id: str) -> bool
+#       Deletes build metadata and artifacts.
+#       Raises FileNotFoundError if build not found.
+#       Raises PermissionError if build is running.
+#
 #   get_build_download(build_id: str) -> str
 #       Returns filesystem path for artifact download.
 #       Raises FileNotFoundError if artifact/build not found.
@@ -270,6 +276,25 @@ def cancel_build(req: Request, build_id: str):
         raise http_409("already_finished")
 
     return CancelOut(cancel_requested=True)
+
+
+@router.delete("/build/{build_id}")
+def delete_build(req: Request, build_id: str):
+    """Delete a build and its artifacts."""
+    reg = req.app.state.builds_registry
+
+    try:
+        reg.delete_build(build_id)
+    except ValueError as e:
+        raise http_400(e)
+    except FileNotFoundError:
+        raise http_404("build_not_found")
+    except PermissionError:
+        raise http_409("build_running")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": str(e)})
+
+    return {"deleted": True}
 
 
 @router.get("/build/{build_id}/download")
