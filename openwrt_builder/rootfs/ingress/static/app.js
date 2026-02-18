@@ -363,6 +363,9 @@ function profileEditorHtml(id, model, listOptions, fileOptions) {
             .filter((v) => !normalizedFileOptions.some((o) => o.id === v))
             .map((v) => ({ id: v, title: v, meta: "missing on disk" })),
     ];
+    const defaultSelectedFiles = !id && selectedFiles.length === 0
+        ? mergedFileOptions.map((o) => o.id)
+        : selectedFiles;
 
     return `
     <h2>${id ? "Edit profile" : "Create profile"}</h2>
@@ -375,7 +378,7 @@ function profileEditorHtml(id, model, listOptions, fileOptions) {
     <div class="row"><label>lists</label>${checklistHtml("profile-lists", listOptions, selectedLists, "No lists available")}</div>
     <div class="row"><label>include (one per line)</label><textarea id="profile-include" rows="8">${escapeHtml(includeText)}</textarea></div>
     <div class="row"><label>exclude (one per line)</label><textarea id="profile-exclude" rows="8">${escapeHtml(excludeText)}</textarea></div>
-    <div class="row"><label>files</label>${checklistHtml("profile-files", mergedFileOptions, selectedFiles, "No files uploaded")}</div>
+    <div class="row"><label>files</label>${checklistHtml("profile-files", mergedFileOptions, defaultSelectedFiles, "No files uploaded")}</div>
     <input id="profile-schema-version" type="hidden" value="${escapeAttr(schemaVersion)}" />
     <div class="row buttons">
       <button id="profile-save" type="button">Save</button>
