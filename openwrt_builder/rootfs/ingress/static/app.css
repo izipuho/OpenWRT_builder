@@ -67,6 +67,18 @@ button {
     background: #f6f6f6;
     border-radius: 8px;
     padding: 6px 10px;
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease, transform 60ms ease;
+}
+
+button:hover {
+    background: #efefef;
+    border-color: #c9c9c9;
+}
+
+button:active {
+    background: #e6e6e6;
+    transform: translateY(1px);
 }
 
 .table table {
