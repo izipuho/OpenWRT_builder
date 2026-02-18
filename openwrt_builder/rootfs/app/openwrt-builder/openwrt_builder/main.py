@@ -1,5 +1,6 @@
 """FastAPI app entrypoint for OpenWRT Builder."""
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 from openwrt_builder.api.v1.builds import router as builds_router
 from openwrt_builder.env import env_path
@@ -20,6 +21,7 @@ app.state.profiles_registry = profiles
 app.state.lists_registry = ListsRegistry()
 app.state.builds_registry = BuildsRegistry(builds_dir, profiles, build_queue)
 app.state.build_queue = build_queue
+app.mount("/static", StaticFiles(directory="/ingress/static"), name="static")
 app.include_router(profiles_router)
 app.include_router(builds_router)
 app.include_router(ui_router)
