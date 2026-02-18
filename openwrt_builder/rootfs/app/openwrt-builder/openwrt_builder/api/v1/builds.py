@@ -22,8 +22,10 @@ This module MUST NOT:
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Literal
+from urllib.request import urlopen
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -31,6 +33,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 
 router = APIRouter(prefix="/api/v1", tags=["builds"])
+SYSUPGRADE_LATEST_URL = "https://sysupgrade.openwrt.org/api/v1/latest"
 
 BuildState = Literal["queued", "running", "done", "failed", "canceled"]
 
@@ -113,6 +116,12 @@ class CancelOut(BaseModel):
     cancel_requested: bool
 
 
+class BuildVersionsOut(BaseModel):
+    """Sysupgrade versions for build requests."""
+    latest: str
+    versions: list[str]
+
+
 # =========================
 # Error helpers (contract)
 # =========================
@@ -130,6 +139,23 @@ def http_404(reason: str) -> HTTPException:
 def http_409(reason: str) -> HTTPException:
     """Return v1 409 conflict with reason."""
     return HTTPException(status_code=409, detail={"code": "conflict", "reason": reason})
+
+
+def _load_sysupgrade_latest() -> str:
+    with urlopen(SYSUPGRADE_LATEST_URL, timeout=8) as res:
+        text = res.read().decode("utf-8").strip()
+    if not text:
+        raise ValueError("empty_latest")
+
+    # Upstream may return either plain text ("24.10.2") or JSON payload.
+    if text.startswith("{"):
+        payload = json.loads(text)
+        if isinstance(payload, dict):
+            latest = payload.get("latest")
+            if isinstance(latest, str) and latest.strip():
+                return latest.strip()
+        raise ValueError("invalid_latest_payload")
+    return text
 
 
 # =========================
@@ -225,6 +251,17 @@ def get_builds(req: Request):
         except ValidationError:
             continue
     return summaries
+
+
+@router.get("/build-versions", response_model=BuildVersionsOut)
+def get_build_versions():
+    """Return latest OpenWrt version from official Sysupgrade API."""
+    try:
+        latest = _load_sysupgrade_latest()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail={"code": "upstream_error", "reason": str(e)})
+
+    return BuildVersionsOut(latest=latest, versions=[latest])
 
 
 @router.get("/build/{build_id}", response_model=BuildOut)

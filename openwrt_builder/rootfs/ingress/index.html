@@ -31,12 +31,26 @@
             <div class="editor build-launch">
                 <h2>Start Build</h2>
                 <div class="toolbar">
-                <select id="builds-profile"></select>
-                <input id="builds-target" type="text" placeholder="target (e.g. x86_64)" />
-                <input id="builds-version" type="text" placeholder="version (e.g. 23.05.5)" />
-                <label><input id="builds-force" type="checkbox" /> force_rebuild</label>
-                <label><input id="builds-debug" type="checkbox" /> debug</label>
-                <button id="builds-create" type="button">Create</button>
+                    <select id="builds-profile"></select>
+                    <input id="builds-target" type="text" placeholder="target (e.g. x86_64)" />
+                    <select id="builds-version"></select>
+                </div>
+                <div class="checklist build-options">
+                    <label class="checkitem">
+                        <input id="builds-force" type="checkbox" />
+                        <span class="checktext">
+                            <span class="checktitle">force_rebuild</span>
+                        </span>
+                    </label>
+                    <label class="checkitem">
+                        <input id="builds-debug" type="checkbox" />
+                        <span class="checktext">
+                            <span class="checktitle">debug</span>
+                        </span>
+                    </label>
+                </div>
+                <div class="row buttons">
+                    <button id="builds-create" type="button">Create</button>
                 </div>
             </div>
         </section>

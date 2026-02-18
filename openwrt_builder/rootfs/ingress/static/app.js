@@ -480,6 +480,31 @@ function renderBuildProfileOptions(rows) {
         .join("");
 }
 
+function renderBuildVersionOptions(payload = {}) {
+    const select = el("builds-version");
+    const versions = Array.isArray(payload.versions)
+        ? payload.versions.map((v) => String(v).trim()).filter(Boolean)
+        : [];
+    const latest = String(payload.latest || "").trim();
+    const current = String(select.value || "").trim();
+
+    if (!versions.length) {
+        select.innerHTML = `<option value="">No versions available</option>`;
+        return;
+    }
+
+    const selected = versions.includes(current)
+        ? current
+        : (versions.includes(latest) ? latest : versions[0]);
+
+    select.innerHTML = versions
+        .map((v) => {
+            const label = v === latest ? `${v} (latest)` : v;
+            return `<option value="${escapeAttr(v)}" ${v === selected ? "selected" : ""}>${escapeHtml(label)}</option>`;
+        })
+        .join("");
+}
+
 function renderBuildsTable(rows) {
     const html = `
     <table>
@@ -530,11 +555,13 @@ function renderBuildsTable(rows) {
 
 async function refreshBuilds() {
     showBuildsError("");
-    const [profiles, builds] = await Promise.all([
+    const [profiles, builds, versionsPayload] = await Promise.all([
         apiJson(`${API}/profiles`),
         apiJson(`${API}/builds`),
+        apiJson(`${API}/build-versions`).catch(() => ({ versions: [], latest: "" })),
     ]);
     renderBuildProfileOptions(profiles);
+    renderBuildVersionOptions(versionsPayload);
     renderBuildsTable(builds);
 }
 
