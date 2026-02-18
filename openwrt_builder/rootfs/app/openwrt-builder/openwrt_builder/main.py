@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 from openwrt_builder.api.v1.builds import router as builds_router
+from openwrt_builder.api.errors import register_exception_handlers
 from openwrt_builder.env import env_path
 from openwrt_builder.api.v1.profiles import router as profiles_router
 from openwrt_builder.api.v1.files import router as files_router
@@ -23,6 +24,7 @@ app.state.profiles_registry = profiles
 app.state.lists_registry = ListsRegistry()
 app.state.builds_registry = BuildsRegistry(builds_dir, profiles, build_queue)
 app.state.build_queue = build_queue
+register_exception_handlers(app)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
