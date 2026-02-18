@@ -1,6 +1,8 @@
 """Service layer for builds backed by :class:`BuildsRegistry`."""
 from __future__ import annotations
 
+from typing import Any
+
 from openwrt_builder.service.builds_registry import BuildsRegistry
 
 
@@ -11,15 +13,15 @@ class BuildsService:
         """Construct service with the builds registry."""
         self._registry = registry
 
-    def list_builds(self) -> list[dict]:
+    def list_builds(self) -> list[dict[str, Any]]:
         """Return all known builds sorted by registry rules."""
         return self._registry.list_builds()
 
-    def get_build(self, build_id: str) -> dict:
+    def get_build(self, build_id: str) -> dict[str, Any]:
         """Fetch a single build by identifier."""
         return self._registry.get_build(build_id)
 
-    def create_build(self, request: dict) -> tuple[dict, bool]:
+    def create_build(self, request: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         """Create build using registry-defined queue semantics."""
         return self._registry.create_build(request)
 

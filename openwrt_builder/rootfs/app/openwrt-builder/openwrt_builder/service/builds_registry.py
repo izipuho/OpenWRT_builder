@@ -4,8 +4,12 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
+from typing import Any
+
+from pydantic import ValidationError
 
 from openwrt_builder.service.build_queue import BuildQueue
+from openwrt_builder.service.models import BuildModel, BuildRequestModel
 from openwrt_builder.service.profiles_registry import BaseRegistry, ProfilesRegistry
 
 
@@ -34,7 +38,17 @@ class BuildsRegistry:
         """Return the path for a build JSON file by ID."""
         return self._builds_path / f"{build_id}.json"
 
-    def _read_build(self, build_id: str) -> dict:
+    @staticmethod
+    def _validate_build(payload: dict[str, Any]) -> dict[str, Any]:
+        """Validate and normalize build payload."""
+        return BuildModel.model_validate(payload).model_dump()
+
+    @staticmethod
+    def _validate_request(payload: dict[str, Any]) -> dict[str, Any]:
+        """Validate and normalize build request payload."""
+        return BuildRequestModel.model_validate(payload).model_dump()
+
+    def _read_build(self, build_id: str) -> dict[str, Any]:
         """Load a build JSON payload from disk.
 
         Args:
@@ -51,13 +65,14 @@ class BuildsRegistry:
         if not path.exists():
             raise FileNotFoundError(build_id)
         with path.open("r", encoding="utf-8") as f:
-            return json.load(f)
+            payload = json.load(f)
+        return self._validate_build(payload)
 
-    def _write_build(self, build_id: str, payload: dict) -> None:
+    def _write_build(self, build_id: str, payload: dict[str, Any]) -> None:
         """Persist a build JSON payload to disk atomically."""
-        BaseRegistry._atomic_write_json(self._build_path(build_id), payload)
+        BaseRegistry._atomic_write_json(self._build_path(build_id), self._validate_build(payload))
 
-    def update_build(self, build_id: str, updates: dict) -> dict:
+    def update_build(self, build_id: str, updates: dict[str, Any]) -> dict[str, Any]:
         """Update a build payload with the provided fields."""
         build = self._read_build(build_id)
         build.update(updates)
@@ -67,42 +82,42 @@ class BuildsRegistry:
         return build
 
     @staticmethod
-    def _normalize_request(request: dict) -> dict:
+    def _normalize_request(request: dict[str, Any]) -> dict[str, Any]:
         """Normalize a build request for equality comparisons.
 
         This performs a JSON round-trip to deep-copy the request, then ensures
         ``options.force_rebuild`` is set to ``False`` so that equality checks
         ignore explicit rebuild flags.
         """
-        normalized = json.loads(json.dumps(request))
+        normalized = BuildRequestModel.model_validate(request).model_dump()
         options = normalized.get("options") or {}
         options["force_rebuild"] = False
         normalized["options"] = options
         return normalized
 
-    def list_builds(self) -> list[dict]:
+    def list_builds(self) -> list[dict[str, Any]]:
         """Return all build payloads sorted by ``updated_at``.
 
         Returns:
             A list of build payloads sorted by updated timestamp.
         """
-        builds: list[dict] = []
+        builds: list[dict[str, Any]] = []
         if self._builds_path.exists():
             for path in self._builds_path.glob("*.json"):
                 try:
                     with path.open("r", encoding="utf-8") as f:
                         data = json.load(f)
-                    builds.append(data)
-                except (OSError, json.JSONDecodeError):
+                    builds.append(self._validate_build(data))
+                except (OSError, json.JSONDecodeError, ValidationError):
                     continue
         builds.sort(key=lambda x: x["updated_at"])
         return builds
 
-    def get_build(self, build_id: str) -> dict:
+    def get_build(self, build_id: str) -> dict[str, Any]:
         """Fetch a build payload by identifier."""
         return self._read_build(build_id)
 
-    def create_build(self, request: dict) -> tuple[dict, bool]:
+    def create_build(self, request: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         """Create a new build or reuse an existing completed one.
 
         Args:
@@ -118,9 +133,12 @@ class BuildsRegistry:
             ValueError: If ``profile_id`` is missing or invalid.
             FileNotFoundError: If the profile does not exist.
         """
+        try:
+            request = self._validate_request(request)
+        except ValidationError as exc:
+            raise ValueError(str(exc)) from exc
+
         profile_id = request.get("profile_id")
-        if not isinstance(profile_id, str):
-            raise ValueError("profile_id")
         self._profiles.get(profile_id)
 
         normalized = self._normalize_request(request)
