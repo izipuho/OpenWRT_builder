@@ -57,6 +57,20 @@ body {
     margin: 0 0 12px 0;
 }
 
+#view-builds > .table {
+    margin-bottom: 16px;
+}
+
+.build-launch .toolbar {
+    margin: 0;
+}
+
+.build-launch input[type="text"],
+.build-launch select {
+    width: auto;
+    min-width: 220px;
+}
+
 #files-input {
     width: auto;
     max-width: 380px;

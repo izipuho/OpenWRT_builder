@@ -13,14 +13,35 @@
     <header class="header">
         <h1 class="title">OpenWRT Builder</h1>
         <nav class="tabs">
-            <button id="tab-lists" class="tab active" type="button">Lists</button>
+            <button id="tab-builds" class="tab active" type="button">Builds</button>
+            <button id="tab-lists" class="tab" type="button">Lists</button>
             <button id="tab-profiles" class="tab" type="button">Profiles</button>
             <button id="tab-files" class="tab" type="button">Files</button>
         </nav>
     </header>
 
     <main class="main">
-        <section id="view-lists" class="view">
+        <section id="view-builds" class="view">
+            <div class="toolbar">
+                <button id="builds-refresh" type="button">Refresh</button>
+            </div>
+            <div id="builds-table" class="table"></div>
+            <pre id="builds-error" class="error hidden"></pre>
+
+            <div class="editor build-launch">
+                <h2>Start Build</h2>
+                <div class="toolbar">
+                <select id="builds-profile"></select>
+                <input id="builds-target" type="text" placeholder="target (e.g. x86_64)" />
+                <input id="builds-version" type="text" placeholder="version (e.g. 23.05.5)" />
+                <label><input id="builds-force" type="checkbox" /> force_rebuild</label>
+                <label><input id="builds-debug" type="checkbox" /> debug</label>
+                <button id="builds-create" type="button">Create</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="view-lists" class="view hidden">
             <div class="toolbar">
                 <button id="lists-refresh" type="button">Refresh</button>
                 <button id="lists-create" type="button">Create</button>

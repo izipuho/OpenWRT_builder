@@ -4,7 +4,7 @@ const API_BASE = API.replace(/\/api\/v1\/?$/, "");
 const el = (id) => document.getElementById(id);
 
 function setTab(tab) {
-    ["lists", "profiles", "files"].forEach((name) => {
+    ["builds", "lists", "profiles", "files"].forEach((name) => {
         const active = tab === name;
         el(`tab-${name}`).classList.toggle("active", active);
         el(`view-${name}`).classList.toggle("hidden", !active);
@@ -453,6 +453,131 @@ async function deleteProfile(id) {
     await refreshProfiles();
 }
 
+/* ---------------- Builds ---------------- */
+
+function showBuildsError(err = "") {
+    const msg = String(err || "").trim();
+    el("builds-error").textContent = msg;
+    el("builds-error").classList.toggle("hidden", !msg);
+}
+
+function renderBuildProfileOptions(rows) {
+    const select = el("builds-profile");
+    const options = (rows || [])
+        .map((r) => ({
+            id: String(r.profile_id ?? r.id ?? "").trim(),
+            name: String(r.name || "").trim(),
+        }))
+        .filter((r) => r.id);
+
+    if (!options.length) {
+        select.innerHTML = `<option value="">No profiles available</option>`;
+        return;
+    }
+
+    select.innerHTML = options
+        .map((opt) => `<option value="${escapeAttr(opt.id)}">${escapeHtml(opt.name || opt.id)} (${escapeHtml(opt.id)})</option>`)
+        .join("");
+}
+
+function renderBuildsTable(rows) {
+    const html = `
+    <table>
+      <thead>
+        <tr><th>build_id</th><th>state</th><th>progress</th><th>updated_at</th><th>message</th><th></th></tr>
+      </thead>
+      <tbody>
+        ${(rows || []).map((r) => {
+        const buildId = String(r.build_id || "");
+        const state = String(r.state || "");
+        const canCancel = (state === "queued" || state === "running") && !r.cancel_requested;
+        const canDownload = state === "done";
+        return `
+          <tr>
+            <td>${escapeHtml(buildId)}</td>
+            <td>${escapeHtml(state)}</td>
+            <td>${escapeHtml(String(r.progress ?? ""))}%</td>
+            <td>${escapeHtml(r.updated_at ?? "")}</td>
+            <td>${escapeHtml(r.message ?? "")}</td>
+            <td class="actions">
+              ${canCancel ? `<button type="button" data-act="cancel" data-id="${escapeAttr(buildId)}">Cancel</button>` : ""}
+              ${canDownload ? `<button type="button" data-act="download" data-id="${escapeAttr(buildId)}">Download</button>` : ""}
+            </td>
+          </tr>
+        `;
+    }).join("")}
+      </tbody>
+    </table>
+  `;
+    el("builds-table").innerHTML = html;
+
+    el("builds-table").querySelectorAll("button").forEach((b) => {
+        b.addEventListener("click", async () => {
+            const buildId = b.getAttribute("data-id");
+            const act = b.getAttribute("data-act");
+            if (act === "cancel") {
+                await cancelBuild(buildId);
+            } else if (act === "download") {
+                window.open(`${API}/build/${encodeURIComponent(buildId)}/download`, "_blank");
+            }
+        });
+    });
+}
+
+async function refreshBuilds() {
+    showBuildsError("");
+    const [profiles, builds] = await Promise.all([
+        apiJson(`${API}/profiles`),
+        apiJson(`${API}/builds`),
+    ]);
+    renderBuildProfileOptions(profiles);
+    renderBuildsTable(builds);
+}
+
+async function createBuild() {
+    showBuildsError("");
+    const profileId = el("builds-profile").value.trim();
+    const target = el("builds-target").value.trim();
+    const version = el("builds-version").value.trim();
+    const forceRebuild = el("builds-force").checked;
+    const debug = el("builds-debug").checked;
+
+    if (!profileId) {
+        showBuildsError("Select a profile");
+        return;
+    }
+    if (!target) {
+        showBuildsError("Target is required");
+        return;
+    }
+    if (!version) {
+        showBuildsError("Version is required");
+        return;
+    }
+
+    await apiJson(`${API}/build`, {
+        method: "POST",
+        body: JSON.stringify({
+            request: {
+                profile_id: profileId,
+                target,
+                version,
+                options: {
+                    force_rebuild: forceRebuild,
+                    debug,
+                },
+            },
+        }),
+    });
+    await refreshBuilds();
+}
+
+async function cancelBuild(buildId) {
+    showBuildsError("");
+    await apiJson(`${API}/build/${encodeURIComponent(buildId)}/cancel`, { method: "POST" });
+    await refreshBuilds();
+}
+
 /* ---------------- Files ---------------- */
 
 function showFilesError(err = "") {
@@ -538,9 +663,13 @@ function escapeAttr(s) {
 }
 
 function boot() {
+    el("tab-builds").addEventListener("click", () => setTab("builds"));
     el("tab-lists").addEventListener("click", () => setTab("lists"));
     el("tab-profiles").addEventListener("click", () => setTab("profiles"));
     el("tab-files").addEventListener("click", () => setTab("files"));
+
+    el("builds-refresh").addEventListener("click", () => refreshBuilds().catch((e) => showBuildsError(e.message || e)));
+    el("builds-create").addEventListener("click", () => createBuild().catch((e) => showBuildsError(e.message || e)));
 
     el("lists-refresh").addEventListener("click", () => refreshLists().catch(() => { }));
     el("lists-create").addEventListener("click", () => openListEditor(null).catch(() => { }));
@@ -550,7 +679,8 @@ function boot() {
     el("files-refresh").addEventListener("click", () => refreshFiles().catch((e) => showFilesError(e.message || e)));
     el("files-upload").addEventListener("click", () => uploadFiles().catch((e) => showFilesError(e.message || e)));
 
-    setTab("lists");
+    setTab("builds");
+    refreshBuilds().catch((e) => showBuildsError(e.message || e));
     refreshLists().catch(() => { });
     refreshProfiles().catch(() => { });
     refreshFiles().catch((e) => showFilesError(e.message || e));
