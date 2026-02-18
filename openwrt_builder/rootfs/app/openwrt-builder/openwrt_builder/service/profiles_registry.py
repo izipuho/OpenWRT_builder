@@ -86,6 +86,20 @@ class BaseRegistry:
         configs.sort(key=lambda x: x["updated_at"])
         return configs
 
+    def list_summary(self) -> list[dict[str, Any]]:
+        """Return summary records without heavy nested config data."""
+        detail_key = self._config_type
+        summaries: list[dict[str, Any]] = []
+        for item in self.list():
+            summaries.append(
+                {
+                    k: v
+                    for k, v in item.items()
+                    if k != detail_key
+                }
+            )
+        return summaries
+
     def get(self, config_id: str) -> dict[str, Any]:
         """Return a single config by ID or raise FileNotFoundError."""
         path = self._configs_path / f"{config_id}.json"

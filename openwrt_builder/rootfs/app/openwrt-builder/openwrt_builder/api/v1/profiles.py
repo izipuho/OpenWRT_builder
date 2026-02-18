@@ -17,8 +17,8 @@ def health():
 
 @router.get("/profiles")
 def get_profiles(req: Request):
-    """Return all available profile definitions."""
-    return req.app.state.profiles_registry.list()
+    """Return all available profiles (summary only)."""
+    return req.app.state.profiles_registry.list_summary()
 
 @router.get("/profile/{profile_id}", status_code=200)
 def get_profile(req: Request, profile_id: str):
@@ -66,8 +66,8 @@ def delete_profile(req: Request, profile_id: str):
 
 @router.get("/lists")
 def get_lists(req: Request):
-    """Return all available list definitions."""
-    return req.app.state.lists_registry.list()
+    """Return all available lists (summary only)."""
+    return req.app.state.lists_registry.list_summary()
 
 @router.get("/list/{list_id}", status_code=200)
 def get_list(req: Request, list_id: str):
