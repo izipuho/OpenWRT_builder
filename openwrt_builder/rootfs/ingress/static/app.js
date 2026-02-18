@@ -348,7 +348,7 @@ function renderProfilesTable(rows) {
     const html = `
     <table>
       <thead>
-        <tr><th>id</th><th>name</th><th>schema_version</th><th>updated_at</th><th></th></tr>
+        <tr><th>id</th><th>name</th><th>updated_at</th><th></th></tr>
       </thead>
       <tbody>
         ${rows.map((r) => {
@@ -357,7 +357,6 @@ function renderProfilesTable(rows) {
             <tr>
               <td>${escapeHtml(id)}</td>
               <td>${escapeHtml(r.name ?? "")}</td>
-              <td>${escapeHtml(String(r.schema_version ?? ""))}</td>
               <td>${escapeHtml(r.updated_at ?? "")}</td>
               <td class="actions">
                 <button type="button" data-act="edit" data-id="${escapeAttr(id)}">Edit</button>
