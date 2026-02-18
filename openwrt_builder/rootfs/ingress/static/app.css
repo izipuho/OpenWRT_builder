@@ -75,10 +75,12 @@ body {
     background: transparent;
 }
 
-.build-launch input[type="text"],
-.build-launch select {
-    width: auto;
-    min-width: 220px;
+.build-field {
+    width: 260px;
+    min-width: 260px;
+    max-width: 260px;
+    flex: 0 0 260px;
+    height: 38px;
 }
 
 #files-input {
@@ -147,7 +149,8 @@ button:active {
 }
 
 input,
-textarea {
+textarea,
+select {
     width: 100%;
     border: 1px solid var(--border);
     border-radius: 8px;
