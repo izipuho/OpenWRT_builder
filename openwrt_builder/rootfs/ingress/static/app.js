@@ -482,10 +482,10 @@ function renderBuildProfileOptions(rows) {
 
 function renderBuildVersionOptions(payload = {}) {
     const select = el("builds-version");
-    const versions = Array.isArray(payload.versions)
-        ? payload.versions.map((v) => String(v).trim()).filter(Boolean)
+    const versions = Array.isArray(payload.latest)
+        ? payload.latest.map((v) => String(v).trim()).filter(Boolean)
         : [];
-    const latest = String(payload.latest || "").trim();
+    const latest = versions[0] || "";
     const current = String(select.value || "").trim();
 
     if (!versions.length) {
