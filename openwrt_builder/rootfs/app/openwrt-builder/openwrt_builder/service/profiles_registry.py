@@ -8,8 +8,12 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
+from typing import Any
+
+from pydantic import ValidationError
 
 from openwrt_builder.env import env_path
+from openwrt_builder.service.models import ListModel, ProfileModel
 
 _JSON_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 
@@ -21,6 +25,16 @@ class BaseRegistry:
         """Initialize a registry rooted at the provided configs path."""
         self._configs_path = configs_path
         self._config_type = f"{configs_path.name[:-1]}"
+
+    def _validate_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Validate payload before persistence/readback."""
+        return payload
+
+    def _load_validated(self, path: Path) -> dict[str, Any]:
+        """Load and validate JSON payload from disk."""
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        return self._validate_payload(data)
 
     @staticmethod
     def _now_z() -> str:
@@ -36,7 +50,7 @@ class BaseRegistry:
         return value
 
     @staticmethod
-    def _atomic_write_json(path: Path, data: dict) -> None:
+    def _atomic_write_json(path: Path, data: dict[str, Any]) -> None:
         """Write JSON to a file atomically."""
         tmp_dir = Path("/tmp")
 
@@ -53,14 +67,13 @@ class BaseRegistry:
 
         shutil.move(tmp_name, path)
 
-    def list(self) -> list[dict]:
+    def list(self) -> list[dict[str, Any]]:
         """Return a sorted list of all config records."""
-        configs: list[dict] = []
+        configs: list[dict[str, Any]] = []
         if self._configs_path.exists():
             for path in self._configs_path.glob("*.json"):
                 try:
-                    with path.open("r", encoding="utf-8") as f:
-                        data = json.load(f)
+                    data = self._load_validated(path)
 
                     configs.append(
                         {
@@ -73,17 +86,17 @@ class BaseRegistry:
         configs.sort(key=lambda x: x["updated_at"])
         return configs
 
-    def get(self, config_id: str) -> dict:
+    def get(self, config_id: str) -> dict[str, Any]:
         """Return a single config by ID or raise FileNotFoundError."""
         path = self._configs_path / f"{config_id}.json"
         if not path.exists():
             raise FileNotFoundError(config_id)
 
-        with path.open("r", encoding="utf-8") as f:
-            return {f"{self._config_type}_id": config_id, **json.load(f)}
+        return {f"{self._config_type}_id": config_id, **self._load_validated(path)}
 
-    def create(self, full_config: dict, config_id: str = None, force: bool = False) -> dict:
+    def create(self, full_config: dict[str, Any], config_id: str = None, force: bool = False) -> dict[str, Any]:
         """Create or update a config record and return it."""
+        full_config = self._validate_payload(full_config)
         name = full_config["name"]
         schema_version = full_config["schema_version"]
 
@@ -129,6 +142,13 @@ class ProfilesRegistry(BaseRegistry):
             configs_path = env_path("OPENWRT_BUILDER_PROFILES_DIR")
         super().__init__(configs_path)
 
+    def _validate_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Validate profile payload shape."""
+        try:
+            return ProfileModel.model_validate(payload).model_dump()
+        except ValidationError as exc:
+            raise ValueError(str(exc)) from exc
+
 
 class ListsRegistry(BaseRegistry):
     """Registry wrapper for list configurations."""
@@ -138,3 +158,10 @@ class ListsRegistry(BaseRegistry):
         if configs_path is None:
             configs_path = env_path("OPENWRT_BUILDER_LISTS_DIR")
         super().__init__(configs_path)
+
+    def _validate_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Validate list payload shape."""
+        try:
+            return ListModel.model_validate(payload).model_dump()
+        except ValidationError as exc:
+            raise ValueError(str(exc)) from exc
