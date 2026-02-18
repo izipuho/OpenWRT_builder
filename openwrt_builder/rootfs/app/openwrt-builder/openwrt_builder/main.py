@@ -14,30 +14,38 @@ from openwrt_builder.service.profiles_registry import ListsRegistry, ProfilesReg
 from openwrt_builder.api.ui import router as ui_router
 
 
-builds_dir = env_path("OPENWRT_BUILDER_BUILDS_DIR")
-app = FastAPI(title="OpenWRT Builder", version="v1")
+def create_app() -> FastAPI:
+    """Create and configure FastAPI application instance."""
 
-profiles = ProfilesRegistry()
-build_queue = BuildQueue(builds_dir / "queue.json")
+    builds_dir = env_path("OPENWRT_BUILDER_BUILDS_DIR")
+    app = FastAPI(title="OpenWRT Builder", version="v1")
 
-app.state.profiles_registry = profiles
-app.state.lists_registry = ListsRegistry()
-app.state.builds_registry = BuildsRegistry(builds_dir, profiles, build_queue)
-app.state.build_queue = build_queue
-register_exception_handlers(app)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-app.mount("/static", StaticFiles(directory="/ingress/static"), name="static")
-app.mount("/examples", StaticFiles(directory="/usr/share/openwrt-builder/examples"), name="examples")
-app.include_router(profiles_router)
-app.include_router(files_router)
-app.include_router(builds_router)
-app.include_router(ui_router)
+    profiles = ProfilesRegistry()
+    build_queue = BuildQueue(builds_dir / "queue.json")
+
+    app.state.profiles_registry = profiles
+    app.state.lists_registry = ListsRegistry()
+    app.state.builds_registry = BuildsRegistry(builds_dir, profiles, build_queue)
+    app.state.build_queue = build_queue
+    register_exception_handlers(app)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    app.mount("/static", StaticFiles(directory="/ingress/static"), name="static")
+    app.mount("/examples", StaticFiles(directory="/usr/share/openwrt-builder/examples"), name="examples")
+    app.include_router(profiles_router)
+    app.include_router(files_router)
+    app.include_router(builds_router)
+    app.include_router(ui_router)
+
+    return app
+
+
+app = create_app()
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8080)
