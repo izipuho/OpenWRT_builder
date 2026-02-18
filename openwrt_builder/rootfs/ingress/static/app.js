@@ -1,6 +1,4 @@
-// rootfs/ingress/app.js
-
-const API = "api/v1";
+const API = "http://10.8.25.110:8080/api/v1";
 
 const el = (id) => document.getElementById(id);
 
@@ -13,9 +11,14 @@ function setTab(tab) {
 }
 
 async function apiJson(path, opts = {}) {
+    const headers = { ...(opts.headers || {}) };
+    if (opts.body && !headers["Content-Type"]) {
+        headers["Content-Type"] = "application/json";
+    }
+
     const res = await fetch(path, {
-        headers: { "Content-Type": "application/json" },
         ...opts,
+        headers,
     });
 
     const ct = res.headers.get("content-type") || "";

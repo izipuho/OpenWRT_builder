@@ -1,5 +1,6 @@
 """FastAPI app entrypoint for OpenWRT Builder."""
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 from openwrt_builder.api.v1.builds import router as builds_router
@@ -21,6 +22,13 @@ app.state.profiles_registry = profiles
 app.state.lists_registry = ListsRegistry()
 app.state.builds_registry = BuildsRegistry(builds_dir, profiles, build_queue)
 app.state.build_queue = build_queue
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.mount("/static", StaticFiles(directory="/ingress/static"), name="static")
 app.include_router(profiles_router)
 app.include_router(builds_router)
