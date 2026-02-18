@@ -21,10 +21,10 @@ _JSON_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 class BaseRegistry:
     """Shared JSON file registry for config-like objects."""
 
-    def __init__(self, configs_path: Path) -> None:
+    def __init__(self, configs_path: Path, config_type: str) -> None:
         """Initialize a registry rooted at the provided configs path."""
         self._configs_path = configs_path
-        self._config_type = f"{configs_path.name[:-1]}"
+        self._config_type = config_type
 
     def _validate_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Validate payload before persistence/readback."""
@@ -140,7 +140,7 @@ class ProfilesRegistry(BaseRegistry):
         """Initialize a profile registry rooted at the provided configs path."""
         if configs_path is None:
             configs_path = env_path("OPENWRT_BUILDER_PROFILES_DIR")
-        super().__init__(configs_path)
+        super().__init__(configs_path=configs_path, config_type="profile")
 
     def _validate_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Validate profile payload shape."""
@@ -157,7 +157,7 @@ class ListsRegistry(BaseRegistry):
         """Initialize a list registry rooted at the provided configs path."""
         if configs_path is None:
             configs_path = env_path("OPENWRT_BUILDER_LISTS_DIR")
-        super().__init__(configs_path)
+        super().__init__(configs_path=configs_path, config_type="list")
 
     def _validate_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Validate list payload shape."""
