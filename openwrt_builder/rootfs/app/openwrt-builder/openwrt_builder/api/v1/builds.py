@@ -23,7 +23,6 @@ This module MUST NOT:
 from __future__ import annotations
 
 import json
-import re
 from datetime import datetime
 from typing import Literal
 from urllib.request import Request as UrlRequest, urlopen
@@ -117,12 +116,6 @@ class CancelOut(BaseModel):
     cancel_requested: bool
 
 
-class BuildVersionsOut(BaseModel):
-    """Sysupgrade versions for build requests."""
-    latest: str
-    versions: list[str]
-
-
 # =========================
 # Error helpers (contract)
 # =========================
@@ -140,57 +133,6 @@ def http_404(reason: str) -> HTTPException:
 def http_409(reason: str) -> HTTPException:
     """Return v1 409 conflict with reason."""
     return HTTPException(status_code=409, detail={"code": "conflict", "reason": reason})
-
-
-def _extract_version_from_json(value: object) -> str | None:
-    if isinstance(value, str):
-        s = value.strip()
-        if re.fullmatch(r"\d+\.\d+\.\d+(?:[-.\w]+)?", s) or s.upper() == "SNAPSHOT":
-            return s
-        return None
-    if isinstance(value, dict):
-        for key in ("latest", "version", "release", "stable", "stable_version"):
-            if key in value:
-                got = _extract_version_from_json(value[key])
-                if got:
-                    return got
-        for v in value.values():
-            got = _extract_version_from_json(v)
-            if got:
-                return got
-    if isinstance(value, list):
-        for item in value:
-            got = _extract_version_from_json(item)
-            if got:
-                return got
-    return None
-
-
-def _load_sysupgrade_latest() -> str:
-    req = UrlRequest(
-        SYSUPGRADE_LATEST_URL,
-        headers={
-            "Accept": "application/json,text/plain;q=0.9,*/*;q=0.8",
-            "User-Agent": "openwrt-builder/1.0",
-        },
-    )
-    with urlopen(req, timeout=8) as res:
-        text = res.read().decode("utf-8").strip()
-    if not text:
-        raise ValueError("empty_latest")
-
-    # Upstream may return JSON payload, JSON string, or plain text.
-    if text.startswith("{") or text.startswith("[") or text.startswith('"'):
-        payload = json.loads(text)
-        latest = _extract_version_from_json(payload)
-        if latest:
-            return latest
-        raise ValueError("invalid_latest_payload")
-
-    latest = _extract_version_from_json(text)
-    if latest:
-        return latest
-    raise ValueError("invalid_latest_text")
 
 
 # =========================
@@ -288,15 +230,23 @@ def get_builds(req: Request):
     return summaries
 
 
-@router.get("/build-versions", response_model=BuildVersionsOut)
+@router.get("/build-versions")
 def get_build_versions():
-    """Return latest OpenWrt version from official Sysupgrade API."""
+    """Return sysupgrade latest payload as-is."""
     try:
-        latest = _load_sysupgrade_latest()
+        req = UrlRequest(
+            SYSUPGRADE_LATEST_URL,
+            headers={
+                "Accept": "application/json",
+                "User-Agent": "openwrt-builder/1.0",
+            },
+        )
+        with urlopen(req, timeout=8) as res:
+            payload = json.loads(res.read().decode("utf-8"))
     except Exception as e:
         raise HTTPException(status_code=502, detail={"code": "upstream_error", "reason": str(e)})
 
-    return BuildVersionsOut(latest=latest, versions=[latest])
+    return payload
 
 
 @router.get("/build/{build_id}", response_model=BuildOut)
