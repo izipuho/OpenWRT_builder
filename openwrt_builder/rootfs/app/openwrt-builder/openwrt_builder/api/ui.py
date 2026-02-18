@@ -1,8 +1,22 @@
-from fastapi import APIRouter
-from fastapi.responses import FileResponse
+from pathlib import Path
+
+from fastapi import APIRouter, Request
+from fastapi.responses import HTMLResponse
 
 ui_router = APIRouter(tags=["ui"])
+INDEX_HTML_PATH = Path("/ingress/index.html")
 
 @ui_router.get("/")
-def index():
-    return FileResponse("/ingress/index.html")
+def index(request: Request):
+    html = INDEX_HTML_PATH.read_text(encoding="utf-8")
+    ingress_path = (request.headers.get("X-Ingress-Path") or "").strip()
+
+    if ingress_path and not ingress_path.endswith("/"):
+        ingress_path = f"{ingress_path}/"
+
+    if ingress_path:
+        base_tag = f'    <base href="{ingress_path}" />'
+        if "<head>" in html:
+            html = html.replace("<head>", f"<head>\n{base_tag}", 1)
+
+    return HTMLResponse(html)
