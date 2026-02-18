@@ -1,3 +1,4 @@
+<!-- rootfs/ingress/index.html -->
 <!doctype html>
 <html lang="en">
 
@@ -9,35 +10,35 @@
 </head>
 
 <body>
-    <header>
-        <h1>OpenWRT Builder</h1>
-        <nav>
-            <button id="tab-lists" class="tab active">Lists</button>
-            <button id="tab-profiles" class="tab">Profiles</button>
+    <header class="header">
+        <h1 class="title">OpenWRT Builder</h1>
+        <nav class="tabs">
+            <button id="tab-lists" class="tab active" type="button">Lists</button>
+            <button id="tab-profiles" class="tab" type="button">Profiles</button>
         </nav>
     </header>
 
-    <main>
+    <main class="main">
         <section id="view-lists" class="view">
             <div class="toolbar">
-                <button id="lists-refresh">Refresh</button>
-                <button id="lists-create">Create</button>
+                <button id="lists-refresh" type="button">Refresh</button>
+                <button id="lists-create" type="button">Create</button>
             </div>
-            <div id="lists-table"></div>
+            <div id="lists-table" class="table"></div>
             <div id="lists-editor" class="editor hidden"></div>
         </section>
 
         <section id="view-profiles" class="view hidden">
             <div class="toolbar">
-                <button id="profiles-refresh">Refresh</button>
-                <button id="profiles-create">Create</button>
+                <button id="profiles-refresh" type="button">Refresh</button>
+                <button id="profiles-create" type="button">Create</button>
             </div>
-            <div id="profiles-table"></div>
+            <div id="profiles-table" class="table"></div>
             <div id="profiles-editor" class="editor hidden"></div>
         </section>
     </main>
 
-    <script src="/ui/static/app.js"></script>
+    <script src="app.js"></script>
 </body>
 
 </html>

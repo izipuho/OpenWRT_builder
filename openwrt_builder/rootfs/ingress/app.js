@@ -1,6 +1,6 @@
-// app.js
+// rootfs/ingress/app.js
 
-const API = "/api/v1";
+const API = "api/v1";
 
 const el = (id) => document.getElementById(id);
 
@@ -28,28 +28,23 @@ async function apiJson(path, opts = {}) {
     return body;
 }
 
-async function apiText(path, opts = {}) {
-    const res = await fetch(path, { ...opts });
-    const txt = await res.text();
-    if (!res.ok) throw new Error(`${res.status} ${txt}`);
-    return txt;
-}
-
 /* ---------------- Lists ---------------- */
 
 function renderListsTable(rows) {
     const html = `
     <table>
-      <thead><tr><th>id</th><th>name</th><th>updated_at</th><th></th></tr></thead>
+      <thead>
+        <tr><th>id</th><th>name</th><th>updated_at</th><th></th></tr>
+      </thead>
       <tbody>
-        ${rows.map(r => `
+        ${rows.map((r) => `
           <tr>
             <td>${escapeHtml(r.id)}</td>
             <td>${escapeHtml(r.name ?? "")}</td>
             <td>${escapeHtml(r.updated_at ?? "")}</td>
             <td class="actions">
-              <button data-act="edit" data-id="${escapeAttr(r.id)}">Edit</button>
-              <button data-act="del" data-id="${escapeAttr(r.id)}">Delete</button>
+              <button type="button" data-act="edit" data-id="${escapeAttr(r.id)}">Edit</button>
+              <button type="button" data-act="del" data-id="${escapeAttr(r.id)}">Delete</button>
             </td>
           </tr>
         `).join("")}
@@ -58,7 +53,7 @@ function renderListsTable(rows) {
   `;
     el("lists-table").innerHTML = html;
 
-    el("lists-table").querySelectorAll("button").forEach(b => {
+    el("lists-table").querySelectorAll("button").forEach((b) => {
         b.addEventListener("click", async () => {
             const id = b.getAttribute("data-id");
             const act = b.getAttribute("data-act");
@@ -83,6 +78,24 @@ function hideListsEditor() {
     el("lists-editor").innerHTML = "";
 }
 
+function listEditorHtml(id, name, content) {
+    return `
+    <h2>${id ? "Edit list" : "Create list"}</h2>
+    ${id ? `
+      <div class="row"><label>id</label><input id="list-id" value="${escapeAttr(id)}" disabled /></div>
+    ` : `
+      <div class="row"><label>id (optional)</label><input id="list-id" placeholder="slug" /></div>
+    `}
+    <div class="row"><label>name</label><input id="list-name" value="${escapeAttr(name)}" /></div>
+    <div class="row"><label>content</label><textarea id="list-content" rows="12">${escapeHtml(content)}</textarea></div>
+    <div class="row buttons">
+      <button id="list-save" type="button">Save</button>
+      <button id="list-cancel" type="button">Cancel</button>
+    </div>
+    <pre id="list-error" class="error hidden"></pre>
+  `;
+}
+
 async function openListEditor(id = null) {
     if (id) {
         const obj = await apiJson(`${API}/list/${encodeURIComponent(id)}`);
@@ -92,22 +105,6 @@ async function openListEditor(id = null) {
         showListsEditor(listEditorHtml("", "", ""));
         wireListEditor(null);
     }
-}
-
-function listEditorHtml(id, name, content) {
-    return `
-    <h2>${id ? "Edit list" : "Create list"}</h2>
-    ${id ? `<div class="row"><label>id</label><input id="list-id" value="${escapeAttr(id)}" disabled /></div>` : `
-      <div class="row"><label>id (optional)</label><input id="list-id" placeholder="slug" /></div>
-    `}
-    <div class="row"><label>name</label><input id="list-name" value="${escapeAttr(name)}" /></div>
-    <div class="row"><label>content</label><textarea id="list-content" rows="12">${escapeHtml(content)}</textarea></div>
-    <div class="row">
-      <button id="list-save">Save</button>
-      <button id="list-cancel">Cancel</button>
-    </div>
-    <pre id="list-error" class="error hidden"></pre>
-  `;
 }
 
 function wireListEditor(existingId) {
@@ -151,26 +148,31 @@ async function deleteList(id) {
 function renderProfilesTable(rows) {
     const html = `
     <table>
-      <thead><tr><th>id</th><th>name</th><th>schema_version</th><th>updated_at</th><th></th></tr></thead>
+      <thead>
+        <tr><th>id</th><th>name</th><th>schema_version</th><th>updated_at</th><th></th></tr>
+      </thead>
       <tbody>
-        ${rows.map(r => `
-          <tr>
-            <td>${escapeHtml(r.profile_id ?? r.id ?? "")}</td>
-            <td>${escapeHtml(r.name ?? "")}</td>
-            <td>${escapeHtml(String(r.schema_version ?? ""))}</td>
-            <td>${escapeHtml(r.updated_at ?? "")}</td>
-            <td class="actions">
-              <button data-act="edit" data-id="${escapeAttr(r.profile_id ?? r.id)}">Edit</button>
-              <button data-act="del" data-id="${escapeAttr(r.profile_id ?? r.id)}">Delete</button>
-            </td>
-          </tr>
-        `).join("")}
+        ${rows.map((r) => {
+        const id = r.profile_id ?? r.id ?? "";
+        return `
+            <tr>
+              <td>${escapeHtml(id)}</td>
+              <td>${escapeHtml(r.name ?? "")}</td>
+              <td>${escapeHtml(String(r.schema_version ?? ""))}</td>
+              <td>${escapeHtml(r.updated_at ?? "")}</td>
+              <td class="actions">
+                <button type="button" data-act="edit" data-id="${escapeAttr(id)}">Edit</button>
+                <button type="button" data-act="del" data-id="${escapeAttr(id)}">Delete</button>
+              </td>
+            </tr>
+          `;
+    }).join("")}
       </tbody>
     </table>
   `;
     el("profiles-table").innerHTML = html;
 
-    el("profiles-table").querySelectorAll("button").forEach(b => {
+    el("profiles-table").querySelectorAll("button").forEach((b) => {
         b.addEventListener("click", async () => {
             const id = b.getAttribute("data-id");
             const act = b.getAttribute("data-act");
@@ -195,6 +197,36 @@ function hideProfilesEditor() {
     el("profiles-editor").innerHTML = "";
 }
 
+function defaultProfileJson() {
+    return JSON.stringify(
+        {
+            name: "New profile",
+            schema_version: 1,
+            updated_at: new Date().toISOString(),
+            profile: { lists: [], extra_include: [], extra_exclude: [] },
+        },
+        null,
+        2
+    );
+}
+
+function profileEditorHtml(id, jsonText) {
+    return `
+    <h2>${id ? "Edit profile (full replace)" : "Create profile"}</h2>
+    ${id ? `
+      <div class="row"><label>id</label><input id="profile-id" value="${escapeAttr(id)}" disabled /></div>
+    ` : `
+      <div class="row"><label>profile_id (optional)</label><input id="profile-id" placeholder="slug" /></div>
+    `}
+    <div class="row"><label>json</label><textarea id="profile-json" rows="16">${escapeHtml(jsonText)}</textarea></div>
+    <div class="row buttons">
+      <button id="profile-save" type="button">Save</button>
+      <button id="profile-cancel" type="button">Cancel</button>
+    </div>
+    <pre id="profile-error" class="error hidden"></pre>
+  `;
+}
+
 async function openProfileEditor(id = null) {
     if (id) {
         const obj = await apiJson(`${API}/profile/${encodeURIComponent(id)}`);
@@ -204,30 +236,6 @@ async function openProfileEditor(id = null) {
         showProfilesEditor(profileEditorHtml("", defaultProfileJson()));
         wireProfileEditor(null);
     }
-}
-
-function defaultProfileJson() {
-    return JSON.stringify({
-        name: "New profile",
-        schema_version: 1,
-        updated_at: new Date().toISOString(),
-        profile: { lists: [], extra_include: [], extra_exclude: [] }
-    }, null, 2);
-}
-
-function profileEditorHtml(id, jsonText) {
-    return `
-    <h2>${id ? "Edit profile (full replace)" : "Create profile"}</h2>
-    ${id ? `<div class="row"><label>id</label><input id="profile-id" value="${escapeAttr(id)}" disabled /></div>` : `
-      <div class="row"><label>profile_id (optional)</label><input id="profile-id" placeholder="slug" /></div>
-    `}
-    <div class="row"><label>json</label><textarea id="profile-json" rows="16">${escapeHtml(jsonText)}</textarea></div>
-    <div class="row">
-      <button id="profile-save">Save</button>
-      <button id="profile-cancel">Cancel</button>
-    </div>
-    <pre id="profile-error" class="error hidden"></pre>
-  `;
 }
 
 function wireProfileEditor(existingId) {
@@ -285,12 +293,13 @@ function boot() {
     el("tab-lists").addEventListener("click", () => setTab("lists"));
     el("tab-profiles").addEventListener("click", () => setTab("profiles"));
 
-    el("lists-refresh").addEventListener("click", refreshLists);
-    el("lists-create").addEventListener("click", () => openListEditor(null));
+    el("lists-refresh").addEventListener("click", () => refreshLists().catch(() => { }));
+    el("lists-create").addEventListener("click", () => openListEditor(null).catch(() => { }));
 
-    el("profiles-refresh").addEventListener("click", refreshProfiles);
-    el("profiles-create").addEventListener("click", () => openProfileEditor(null));
+    el("profiles-refresh").addEventListener("click", () => refreshProfiles().catch(() => { }));
+    el("profiles-create").addEventListener("click", () => openProfileEditor(null).catch(() => { }));
 
+    setTab("lists");
     refreshLists().catch(() => { });
     refreshProfiles().catch(() => { });
 }

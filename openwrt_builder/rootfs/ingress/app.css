@@ -1,53 +1,78 @@
-/* app.css */
+/* rootfs/ingress/app.css */
+
+:root {
+    --border: #ddd;
+    --bg: #fff;
+    --muted: #666;
+}
+
+* {
+    box-sizing: border-box;
+}
 
 body {
-    font-family: system-ui, sans-serif;
     margin: 0;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background: var(--bg);
 }
 
-header {
+.header {
     padding: 12px 16px;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border);
 }
 
-nav {
+.title {
+    margin: 0 0 10px 0;
+    font-size: 28px;
+    font-weight: 800;
+}
+
+.tabs {
     display: flex;
     gap: 8px;
-    margin-top: 8px;
 }
 
 .tab {
     padding: 6px 10px;
+    border: 1px solid var(--border);
+    background: #f6f6f6;
+    border-radius: 8px;
 }
 
 .tab.active {
     font-weight: 700;
+    background: #fff;
 }
 
-main {
+.main {
     padding: 16px;
-}
-
-.hidden {
-    display: none;
+    max-width: 1100px;
 }
 
 .toolbar {
     display: flex;
     gap: 8px;
-    margin-bottom: 12px;
+    margin: 0 0 12px 0;
 }
 
-table {
-    border-collapse: collapse;
+button {
+    border: 1px solid var(--border);
+    background: #f6f6f6;
+    border-radius: 8px;
+    padding: 6px 10px;
+}
+
+.table table {
     width: 100%;
+    border-collapse: collapse;
 }
 
-th,
-td {
-    border: 1px solid #ddd;
+.table th,
+.table td {
+    border: 1px solid var(--border);
     padding: 6px 8px;
     text-align: left;
+    vertical-align: top;
 }
 
 .actions {
@@ -56,24 +81,55 @@ td {
 
 .editor {
     margin-top: 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
     padding: 12px;
-    border: 1px solid #ddd;
+    background: #fff;
+}
+
+.editor h2 {
+    margin: 0 0 12px 0;
+    font-size: 18px;
 }
 
 .row {
-    margin: 8px 0;
     display: grid;
     gap: 6px;
+    margin: 10px 0;
+}
+
+.row label {
+    color: var(--muted);
+    font-size: 12px;
 }
 
 input,
 textarea {
     width: 100%;
-    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    font: inherit;
+}
+
+textarea {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.row.buttons {
+    display: flex;
+    gap: 8px;
 }
 
 .error {
-    background: #fff3f3;
+    margin: 10px 0 0 0;
+    padding: 10px;
     border: 1px solid #f0b4b4;
-    padding: 8px;
+    border-radius: 8px;
+    background: #fff3f3;
+    white-space: pre-wrap;
+}
+
+.hidden {
+    display: none !important;
 }
