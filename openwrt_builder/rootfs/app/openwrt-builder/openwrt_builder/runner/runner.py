@@ -16,17 +16,20 @@ import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 import fcntl
+from pydantic import ValidationError
 
 from openwrt_builder.service.build_queue import BuildQueue
+from openwrt_builder.service.models import BuildModel, BuildResultModel
 from openwrt_builder.service.profiles_registry import BaseRegistry
 
 
 @dataclass(frozen=True)
 class RunnerConfig:
     """Runtime config for the build runner."""
+
     builds_dir: Path
     runtime_dir: Path
     poll_interval_sec: float = 1.0
@@ -73,7 +76,7 @@ class BuildRunner:
         self,
         cfg: RunnerConfig,
         queue: BuildQueue,
-        executor: Callable[[dict], dict],
+        executor: Callable[[dict[str, Any]], dict[str, Any]],
     ) -> None:
         """
         Args:
@@ -91,28 +94,34 @@ class BuildRunner:
         """Return JSON metadata path for a build identifier."""
         return self._cfg.builds_dir / f"{build_id}.json"
 
-    def _read_build(self, build_id: str) -> dict:
+    @staticmethod
+    def _validate_build(payload: dict[str, Any]) -> dict[str, Any]:
+        """Validate and normalize build payload."""
+        return BuildModel.model_validate(payload).model_dump()
+
+    def _read_build(self, build_id: str) -> dict[str, Any]:
         """Read and deserialize build metadata for a build identifier."""
         path = self._build_path(build_id)
         if not path.exists():
             raise FileNotFoundError(build_id)
         with path.open("r", encoding="utf-8") as f:
-            return json.load(f)
+            payload = json.load(f)
+        return self._validate_build(payload)
 
-    def _write_build(self, build_id: str, payload: dict) -> None:
+    def _write_build(self, build_id: str, payload: dict[str, Any]) -> None:
         """Persist build metadata atomically."""
-        BaseRegistry._atomic_write_json(self._build_path(build_id), payload)
+        BaseRegistry._atomic_write_json(self._build_path(build_id), self._validate_build(payload))
 
     def _set_state(
         self,
-        build: dict,
+        build: dict[str, Any],
         *,
         state: str | None = None,
         progress: int | None = None,
         message: str | None = None,
-        result: dict | None = None,
+        result: dict[str, Any] | None = None,
         runner_pid: int | None | object = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Apply partial build state changes and refresh update timestamp."""
         if state is not None:
             build["state"] = state
@@ -121,7 +130,7 @@ class BuildRunner:
         build["updated_at"] = BaseRegistry._now_z()
         build["message"] = message
         if result is not None:
-            build["result"] = result
+            build["result"] = BuildResultModel.model_validate(result).model_dump()
         if runner_pid is not None:
             build["runner_pid"] = runner_pid
         return build
@@ -133,7 +142,7 @@ class BuildRunner:
         for path in self._cfg.builds_dir.glob("*.json"):
             try:
                 with path.open("r", encoding="utf-8") as f:
-                    b = json.load(f)
+                    b = self._validate_build(json.load(f))
                 if b.get("state") != "running":
                     continue
                 b["state"] = "queued"
@@ -143,7 +152,7 @@ class BuildRunner:
                 b["updated_at"] = BaseRegistry._now_z()
                 BaseRegistry._atomic_write_json(path, b)
                 n += 1
-            except (OSError, json.JSONDecodeError):
+            except (OSError, json.JSONDecodeError, ValidationError):
                 continue
         return n
 
@@ -161,7 +170,7 @@ class BuildRunner:
 
                 try:
                     build = self._read_build(build_id)
-                except (FileNotFoundError, json.JSONDecodeError):
+                except (FileNotFoundError, json.JSONDecodeError, ValidationError):
                     continue
 
                 state = build.get("state")
@@ -201,7 +210,7 @@ class BuildRunner:
                     # cancel may have been requested during execution
                     try:
                         build = self._read_build(build_id)
-                    except (FileNotFoundError, json.JSONDecodeError):
+                    except (FileNotFoundError, json.JSONDecodeError, ValidationError):
                         continue
                     if build.get("cancel_requested") is True:
                         build = self._set_state(build, state="canceled", message="canceled", runner_pid=None)
@@ -213,7 +222,7 @@ class BuildRunner:
                 except Exception as e:
                     try:
                         build = self._read_build(build_id)
-                    except (FileNotFoundError, json.JSONDecodeError):
+                    except (FileNotFoundError, json.JSONDecodeError, ValidationError):
                         continue
                     build = self._set_state(build, state="failed", message=str(e), runner_pid=None)
                     self._write_build(build_id, build)

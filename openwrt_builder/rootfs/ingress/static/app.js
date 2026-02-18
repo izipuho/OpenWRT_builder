@@ -1,6 +1,11 @@
 const API = "http://10.8.25.110:8080/api/v1";
 const API_BASE = API.replace(/\/api\/v1\/?$/, "");
 
+const templateCache = {
+    list: null,
+    profile: null,
+};
+
 const el = (id) => document.getElementById(id);
 
 function setTab(tab) {
@@ -34,8 +39,6 @@ async function apiJson(path, opts = {}) {
 
 /* ---------------- Lists ---------------- */
 
-let listTemplateCache = null;
-
 function normalizeListTemplate(obj = {}) {
     const list = obj.list || {};
     return {
@@ -48,20 +51,29 @@ function normalizeListTemplate(obj = {}) {
     };
 }
 
-async function getListTemplate() {
-    if (listTemplateCache) return listTemplateCache;
+async function getTemplate({ cacheKey, examplePath, normalize, fallback }) {
+    if (templateCache[cacheKey]) return templateCache[cacheKey];
     try {
-        const res = await fetch(`${API_BASE}/examples/list.json`);
+        const res = await fetch(`${API_BASE}${examplePath}`);
         if (!res.ok) throw new Error(`template_http_${res.status}`);
-        listTemplateCache = normalizeListTemplate(await res.json());
+        templateCache[cacheKey] = normalize(await res.json());
     } catch (_) {
-        listTemplateCache = normalizeListTemplate({
+        templateCache[cacheKey] = normalize(fallback);
+    }
+    return templateCache[cacheKey];
+}
+
+async function getListTemplate() {
+    return getTemplate({
+        cacheKey: "list",
+        examplePath: "/examples/list.json",
+        normalize: normalizeListTemplate,
+        fallback: {
             name: "New list",
             schema_version: 1,
             list: { include: [], exclude: [] },
-        });
-    }
-    return listTemplateCache;
+        },
+    });
 }
 
 function arrayToLines(items) {
@@ -162,18 +174,52 @@ async function openListEditor(id = null) {
     }
 }
 
-function wireListEditor(existingId) {
-    el("list-cancel").addEventListener("click", hideListsEditor);
+function wireCrudEditor({
+    cancelId,
+    saveId,
+    errorId,
+    onCancel,
+    collectBody,
+    saveExisting,
+    saveNew,
+    afterSuccess,
+}) {
+    el(cancelId).addEventListener("click", onCancel);
 
-    el("list-save").addEventListener("click", async () => {
+    el(saveId).addEventListener("click", async () => {
         try {
-            el("list-error").classList.add("hidden");
+            el(errorId).classList.add("hidden");
+            const payload = collectBody();
+
+            if (payload.existingId) {
+                await saveExisting(payload);
+            } else {
+                await saveNew(payload);
+            }
+
+            await afterSuccess();
+        } catch (e) {
+            el(errorId).textContent = String(e.message || e);
+            el(errorId).classList.remove("hidden");
+        }
+    });
+}
+
+function wireListEditor(existingId) {
+    wireCrudEditor({
+        cancelId: "list-cancel",
+        saveId: "list-save",
+        errorId: "list-error",
+        onCancel: hideListsEditor,
+        collectBody: () => {
             const id = el("list-id").value.trim();
             const name = el("list-name").value.trim();
             const schemaVersion = Number(el("list-schema-version").value) || 1;
             const include = linesToArray(el("list-include").value);
             const exclude = linesToArray(el("list-exclude").value);
-            const body = {
+            return {
+                existingId,
+                id,
                 name,
                 schema_version: schemaVersion,
                 list: {
@@ -181,25 +227,32 @@ function wireListEditor(existingId) {
                     exclude,
                 },
             };
-
-            if (existingId) {
-                await apiJson(`${API}/list/${encodeURIComponent(existingId)}`, {
-                    method: "PUT",
-                    body: JSON.stringify(body),
-                });
-            } else {
-                await apiJson(`${API}/list`, {
-                    method: "POST",
-                    body: JSON.stringify({ list_id: id || undefined, ...body }),
-                });
-            }
-
+        },
+        saveExisting: async (payload) => {
+            await apiJson(`${API}/list/${encodeURIComponent(payload.existingId)}`, {
+                method: "PUT",
+                body: JSON.stringify({
+                    name: payload.name,
+                    schema_version: payload.schema_version,
+                    list: payload.list,
+                }),
+            });
+        },
+        saveNew: async (payload) => {
+            await apiJson(`${API}/list`, {
+                method: "POST",
+                body: JSON.stringify({
+                    list_id: payload.id || undefined,
+                    name: payload.name,
+                    schema_version: payload.schema_version,
+                    list: payload.list,
+                }),
+            });
+        },
+        afterSuccess: async () => {
             hideListsEditor();
             await refreshLists();
-        } catch (e) {
-            el("list-error").textContent = String(e.message || e);
-            el("list-error").classList.remove("hidden");
-        }
+        },
     });
 }
 
@@ -209,8 +262,6 @@ async function deleteList(id) {
 }
 
 /* ---------------- Profiles ---------------- */
-
-let profileTemplateCache = null;
 
 function normalizeProfileTemplate(obj = {}) {
     const profile = obj.profile || {};
@@ -227,19 +278,16 @@ function normalizeProfileTemplate(obj = {}) {
 }
 
 async function getProfileTemplate() {
-    if (profileTemplateCache) return profileTemplateCache;
-    try {
-        const res = await fetch(`${API_BASE}/examples/profile.json`);
-        if (!res.ok) throw new Error(`template_http_${res.status}`);
-        profileTemplateCache = normalizeProfileTemplate(await res.json());
-    } catch (_) {
-        profileTemplateCache = normalizeProfileTemplate({
+    return getTemplate({
+        cacheKey: "profile",
+        examplePath: "/examples/profile.json",
+        normalize: normalizeProfileTemplate,
+        fallback: {
             name: "New profile",
             schema_version: 1,
             profile: { lists: [], extra_include: [], extra_exclude: [], files: [] },
-        });
-    }
-    return profileTemplateCache;
+        },
+    });
 }
 
 async function getListChoices() {
@@ -404,11 +452,12 @@ async function openProfileEditor(id = null) {
 }
 
 function wireProfileEditor(existingId) {
-    el("profile-cancel").addEventListener("click", hideProfilesEditor);
-
-    el("profile-save").addEventListener("click", async () => {
-        try {
-            el("profile-error").classList.add("hidden");
+    wireCrudEditor({
+        cancelId: "profile-cancel",
+        saveId: "profile-save",
+        errorId: "profile-error",
+        onCancel: hideProfilesEditor,
+        collectBody: () => {
             const id = el("profile-id").value.trim();
             const name = el("profile-name").value.trim();
             const schemaVersion = Number(el("profile-schema-version").value) || 1;
@@ -416,7 +465,9 @@ function wireProfileEditor(existingId) {
             const include = linesToArray(el("profile-include").value);
             const exclude = linesToArray(el("profile-exclude").value);
             const files = checkedValues("profile-files");
-            const body = {
+            return {
+                existingId,
+                id,
                 name,
                 schema_version: schemaVersion,
                 profile: {
@@ -426,25 +477,32 @@ function wireProfileEditor(existingId) {
                     files,
                 },
             };
-
-            if (existingId) {
-                await apiJson(`${API}/profile/${encodeURIComponent(existingId)}`, {
-                    method: "PUT",
-                    body: JSON.stringify(body),
-                });
-            } else {
-                await apiJson(`${API}/profile`, {
-                    method: "POST",
-                    body: JSON.stringify({ profile_id: id || undefined, ...body }),
-                });
-            }
-
+        },
+        saveExisting: async (payload) => {
+            await apiJson(`${API}/profile/${encodeURIComponent(payload.existingId)}`, {
+                method: "PUT",
+                body: JSON.stringify({
+                    name: payload.name,
+                    schema_version: payload.schema_version,
+                    profile: payload.profile,
+                }),
+            });
+        },
+        saveNew: async (payload) => {
+            await apiJson(`${API}/profile`, {
+                method: "POST",
+                body: JSON.stringify({
+                    profile_id: payload.id || undefined,
+                    name: payload.name,
+                    schema_version: payload.schema_version,
+                    profile: payload.profile,
+                }),
+            });
+        },
+        afterSuccess: async () => {
             hideProfilesEditor();
             await refreshProfiles();
-        } catch (e) {
-            el("profile-error").textContent = String(e.message || e);
-            el("profile-error").classList.remove("hidden");
-        }
+        },
     });
 }
 

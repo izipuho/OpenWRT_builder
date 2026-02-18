@@ -5,23 +5,14 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, File, Request, UploadFile
+
+from openwrt_builder.api.errors import http_400, http_404
 
 from openwrt_builder.env import env_path
 
 router = APIRouter(prefix="/api/v1", tags=["files"])
 FILES_DIR = env_path("OPENWRT_BUILDER_FILES_DIR").resolve()
-
-
-def http_400(e: Exception) -> HTTPException:
-    """Return v1 400 invalid_request with reason."""
-    return HTTPException(status_code=400, detail={"code": "invalid_request", "reason": str(e)})
-
-
-def http_404(reason: str) -> HTTPException:
-    """Return v1 404 not_found with reason."""
-    return HTTPException(status_code=404, detail={"code": "not_found", "reason": reason})
-
 
 def _safe_rel(path: str) -> Path:
     raw = str(path or "").strip().replace("\\", "/")

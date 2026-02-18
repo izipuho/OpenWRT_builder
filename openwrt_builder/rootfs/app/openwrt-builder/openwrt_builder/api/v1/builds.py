@@ -23,116 +23,32 @@ This module MUST NOT:
 from __future__ import annotations
 
 import json
-from datetime import datetime
-from typing import Literal
+from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest, urlopen
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import ValidationError
+
+from openwrt_builder.api.errors import http_502
+from openwrt_builder.api.builds_errors import (
+    invalid_build_payload_error,
+    map_cancel_build_error,
+    map_create_build_error,
+    map_delete_build_error,
+    map_download_build_error,
+    map_get_build_error,
+)
+from openwrt_builder.api.builds_schemas import (
+    BuildCreateIn,
+    BuildOut,
+    BuildSummaryOut,
+    CancelOut,
+)
 
 
 router = APIRouter(prefix="/api/v1", tags=["builds"])
 SYSUPGRADE_LATEST_URL = "https://sysupgrade.openwrt.org/api/v1/latest"
-
-BuildState = Literal["queued", "running", "done", "failed", "canceled"]
-
-
-# =========================
-# DTOs (request/response)
-# =========================
-
-class BuildOptions(BaseModel):
-    """
-    Optional build flags.
-
-    force_rebuild:
-        If true, registry must ignore cache and create a new build.
-
-    debug:
-        If true, the flag is forwarded to runner for verbose behavior/logging.
-    """
-    force_rebuild: bool = False
-    debug: bool = False
-
-
-class BuildRequest(BaseModel):
-    """
-    Build request payload (the 'request' object).
-
-    Only presence and types are validated here (per contract).
-    """
-    profile_id: str
-    target: str
-    version: str
-    options: BuildOptions = Field(default_factory=BuildOptions)
-
-
-class BuildCreateIn(BaseModel):
-    """
-    POST /api/v1/build request body.
-    """
-    request: BuildRequest
-
-
-class BuildSummaryOut(BaseModel):
-    """
-    Build summary representation.
-    Used in GET /api/v1/builds.
-    """
-    build_id: str
-    state: BuildState
-    created_at: datetime
-    updated_at: datetime
-    progress: int = Field(ge=0, le=100)
-    message: str|None = None
-    cancel_requested: bool = False
-    runner_pid: int | None = None
-
-
-class BuildResultOut(BaseModel):
-    """
-    Build result payload.
-
-    path:
-        Filesystem path to the produced artifact.
-    """
-    path: str
-
-
-class BuildOut(BuildSummaryOut):
-    """
-    Full build representation.
-    Used in GET /api/v1/build/{id} and POST /api/v1/build.
-    """
-    request: BuildRequest
-    result: BuildResultOut|None = None
-
-
-class CancelOut(BaseModel):
-    """
-    Cancel endpoint response.
-    """
-    cancel_requested: bool
-
-
-# =========================
-# Error helpers (contract)
-# =========================
-
-def http_400(e: Exception) -> HTTPException:
-    """Return v1 400 invalid_request with reason."""
-    return HTTPException(status_code=400, detail={"code": "invalid_request", "reason": str(e)})
-
-
-def http_404(reason: str) -> HTTPException:
-    """Return v1 404 not_found with reason."""
-    return HTTPException(status_code=404, detail={"code": "not_found", "reason": reason})
-
-
-def http_409(reason: str) -> HTTPException:
-    """Return v1 409 conflict with reason."""
-    return HTTPException(status_code=409, detail={"code": "conflict", "reason": reason})
 
 
 # =========================
@@ -190,18 +106,13 @@ def post_build(req: Request, body: BuildCreateIn):
 
     try:
         build_dict, created = reg.create_build(body.request.model_dump())
-    except ValueError as e:
-        raise http_400(e)
-    except FileNotFoundError:
-        # Optional mapping if registry checks profile existence early
-        raise http_404("profile_not_found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": str(e)})
+    except (ValueError, FileNotFoundError) as e:
+        raise map_create_build_error(e)
 
     try:
         model = BuildOut.model_validate(build_dict)
     except ValidationError as e:
-        raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": f"invalid_build_payload: {e}"})
+        raise invalid_build_payload_error(e)
 
     return JSONResponse(
         status_code=201 if created else 200,
@@ -211,15 +122,10 @@ def post_build(req: Request, body: BuildCreateIn):
 
 @router.get("/builds", response_model=list[BuildSummaryOut])
 def get_builds(req: Request):
-    """
-    List builds (summary only).
-    """
+    """List builds (summary only)."""
     reg = req.app.state.builds_registry
 
-    try:
-        items = reg.list_builds()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": str(e)})
+    items = reg.list_builds()
 
     summaries: list[BuildSummaryOut] = []
     for item in items:
@@ -243,32 +149,26 @@ def get_build_versions():
         )
         with urlopen(req, timeout=8) as res:
             payload = json.loads(res.read().decode("utf-8"))
-    except Exception as e:
-        raise HTTPException(status_code=502, detail={"code": "upstream_error", "reason": str(e)})
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError) as e:
+        raise http_502(e)
 
     return payload
 
 
 @router.get("/build/{build_id}", response_model=BuildOut)
 def get_build(req: Request, build_id: str):
-    """
-    Get a single build (full representation).
-    """
+    """Get a single build (full representation)."""
     reg = req.app.state.builds_registry
 
     try:
         b = reg.get_build(build_id)
-    except ValueError as e:
-        raise http_400(e)
-    except FileNotFoundError:
-        raise http_404("build_not_found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": str(e)})
+    except (ValueError, FileNotFoundError) as e:
+        raise map_get_build_error(e)
 
     try:
         return BuildOut.model_validate(b)
     except ValidationError as e:
-        raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": f"invalid_build_payload: {e}"})
+        raise invalid_build_payload_error(e)
 
 
 @router.post("/build/{build_id}/cancel", response_model=CancelOut)
@@ -285,17 +185,11 @@ def cancel_build(req: Request, build_id: str):
 
     try:
         ok = reg.cancel_build(build_id)
-    except ValueError as e:
-        raise http_400(e)
-    except FileNotFoundError:
-        raise http_404("build_not_found")
-    except PermissionError:
-        raise http_409("already_finished")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": str(e)})
+    except (ValueError, FileNotFoundError, PermissionError) as e:
+        raise map_cancel_build_error(e)
 
     if not ok:
-        raise http_409("already_finished")
+        raise map_cancel_build_error(PermissionError("already_finished"))
 
     return CancelOut(cancel_requested=True)
 
@@ -307,14 +201,8 @@ def delete_build(req: Request, build_id: str):
 
     try:
         reg.delete_build(build_id)
-    except ValueError as e:
-        raise http_400(e)
-    except FileNotFoundError:
-        raise http_404("build_not_found")
-    except PermissionError:
-        raise http_409("build_running")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": str(e)})
+    except (ValueError, FileNotFoundError, PermissionError) as e:
+        raise map_delete_build_error(e)
 
     return {"deleted": True}
 
@@ -333,14 +221,8 @@ def download_build(req: Request, build_id: str):
 
     try:
         path = reg.get_build_download(build_id)
-    except ValueError as e:
-        raise http_400(e)
-    except FileNotFoundError:
-        raise http_404("artifact_not_found")
-    except PermissionError:
-        raise http_409("not_ready")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": str(e)})
+    except (ValueError, FileNotFoundError, PermissionError) as e:
+        raise map_download_build_error(e)
 
     return FileResponse(
         path=path,
