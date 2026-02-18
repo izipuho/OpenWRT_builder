@@ -1,31 +1,9 @@
 """Profiles and lists API endpoints (v1)."""
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
+
+from openwrt_builder.api.errors import http_400, http_404, http_409
 
 router = APIRouter(prefix="/api/v1", tags=["profiles", "lists"])
-
-
-# =========================
-# Error helpers (contract)
-# =========================
-
-def http_400(e: Exception) -> HTTPException:
-    """Return v1 400 invalid_request with reason."""
-    return HTTPException(status_code=400, detail={"code": "invalid_request", "reason": str(e)})
-
-
-def http_404(reason: str) -> HTTPException:
-    """Return v1 404 not_found with reason."""
-    return HTTPException(status_code=404, detail={"code": "not_found", "reason": reason})
-
-
-def http_409() -> HTTPException:
-    """Return v1 409 conflict."""
-    return HTTPException(status_code=409, detail="conflict")
-
-
-def http_500(e: Exception) -> HTTPException:
-    """Return v1 500 internal_error with reason."""
-    return HTTPException(status_code=500, detail={"code": "internal_error", "reason": str(e)})
 
 
 @router.get("/health")
@@ -72,8 +50,6 @@ def put_profile(req: Request, profile_id: str, body: dict):
         raise http_400(e)
     except FileNotFoundError:
         raise http_404("profile_not_found")
-    except Exception as e:
-        raise http_500(e)
 
 @router.delete("/profile/{profile_id}", status_code=200)
 def delete_profile(req: Request, profile_id: str):
@@ -83,8 +59,6 @@ def delete_profile(req: Request, profile_id: str):
         return reg.delete(profile_id)
     except FileNotFoundError:
         raise http_404("profile_not_found")
-    except Exception as e:
-        raise http_500(e)
 
 # =========================
 # Manage lists
@@ -125,8 +99,6 @@ def put_list(req: Request, list_id: str, body: dict):
         raise http_400(e)
     except FileNotFoundError:
         raise http_404("list_not_found")
-    except Exception as e:
-        raise http_500(e)
 
 @router.delete("/list/{list_id}", status_code=200)
 def delete_list(req: Request, list_id: str):
@@ -136,8 +108,6 @@ def delete_list(req: Request, list_id: str):
         return reg.delete(list_id)
     except FileNotFoundError:
         raise http_404("list_not_found")
-    except Exception as e:
-        raise http_500(e)
 
 # =========================
 # Misc

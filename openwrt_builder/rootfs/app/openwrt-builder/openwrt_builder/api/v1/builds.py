@@ -25,11 +25,14 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from typing import Literal
+from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest, urlopen
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field, ValidationError
+
+from openwrt_builder.api.errors import http_400, http_404, http_409, http_500, http_502
 
 
 router = APIRouter(prefix="/api/v1", tags=["builds"])
@@ -117,25 +120,6 @@ class CancelOut(BaseModel):
 
 
 # =========================
-# Error helpers (contract)
-# =========================
-
-def http_400(e: Exception) -> HTTPException:
-    """Return v1 400 invalid_request with reason."""
-    return HTTPException(status_code=400, detail={"code": "invalid_request", "reason": str(e)})
-
-
-def http_404(reason: str) -> HTTPException:
-    """Return v1 404 not_found with reason."""
-    return HTTPException(status_code=404, detail={"code": "not_found", "reason": reason})
-
-
-def http_409(reason: str) -> HTTPException:
-    """Return v1 409 conflict with reason."""
-    return HTTPException(status_code=409, detail={"code": "conflict", "reason": reason})
-
-
-# =========================
 # Registry interface
 # =========================
 #
@@ -195,13 +179,11 @@ def post_build(req: Request, body: BuildCreateIn):
     except FileNotFoundError:
         # Optional mapping if registry checks profile existence early
         raise http_404("profile_not_found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": str(e)})
 
     try:
         model = BuildOut.model_validate(build_dict)
     except ValidationError as e:
-        raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": f"invalid_build_payload: {e}"})
+        raise http_500(e, reason=f"invalid_build_payload: {e}")
 
     return JSONResponse(
         status_code=201 if created else 200,
@@ -216,10 +198,7 @@ def get_builds(req: Request):
     """
     reg = req.app.state.builds_registry
 
-    try:
-        items = reg.list_builds()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": str(e)})
+    items = reg.list_builds()
 
     summaries: list[BuildSummaryOut] = []
     for item in items:
@@ -243,8 +222,8 @@ def get_build_versions():
         )
         with urlopen(req, timeout=8) as res:
             payload = json.loads(res.read().decode("utf-8"))
-    except Exception as e:
-        raise HTTPException(status_code=502, detail={"code": "upstream_error", "reason": str(e)})
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError) as e:
+        raise http_502(e)
 
     return payload
 
@@ -262,13 +241,11 @@ def get_build(req: Request, build_id: str):
         raise http_400(e)
     except FileNotFoundError:
         raise http_404("build_not_found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": str(e)})
 
     try:
         return BuildOut.model_validate(b)
     except ValidationError as e:
-        raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": f"invalid_build_payload: {e}"})
+        raise http_500(e, reason=f"invalid_build_payload: {e}")
 
 
 @router.post("/build/{build_id}/cancel", response_model=CancelOut)
@@ -291,8 +268,6 @@ def cancel_build(req: Request, build_id: str):
         raise http_404("build_not_found")
     except PermissionError:
         raise http_409("already_finished")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": str(e)})
 
     if not ok:
         raise http_409("already_finished")
@@ -313,8 +288,6 @@ def delete_build(req: Request, build_id: str):
         raise http_404("build_not_found")
     except PermissionError:
         raise http_409("build_running")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": str(e)})
 
     return {"deleted": True}
 
@@ -339,8 +312,6 @@ def download_build(req: Request, build_id: str):
         raise http_404("artifact_not_found")
     except PermissionError:
         raise http_409("not_ready")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail={"code": "internal_error", "reason": str(e)})
 
     return FileResponse(
         path=path,
