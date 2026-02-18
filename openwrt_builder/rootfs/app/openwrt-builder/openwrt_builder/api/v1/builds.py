@@ -23,9 +23,10 @@ This module MUST NOT:
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from typing import Literal
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -141,21 +142,55 @@ def http_409(reason: str) -> HTTPException:
     return HTTPException(status_code=409, detail={"code": "conflict", "reason": reason})
 
 
+def _extract_version_from_json(value: object) -> str | None:
+    if isinstance(value, str):
+        s = value.strip()
+        if re.fullmatch(r"\d+\.\d+\.\d+(?:[-.\w]+)?", s) or s.upper() == "SNAPSHOT":
+            return s
+        return None
+    if isinstance(value, dict):
+        for key in ("latest", "version", "release", "stable", "stable_version"):
+            if key in value:
+                got = _extract_version_from_json(value[key])
+                if got:
+                    return got
+        for v in value.values():
+            got = _extract_version_from_json(v)
+            if got:
+                return got
+    if isinstance(value, list):
+        for item in value:
+            got = _extract_version_from_json(item)
+            if got:
+                return got
+    return None
+
+
 def _load_sysupgrade_latest() -> str:
-    with urlopen(SYSUPGRADE_LATEST_URL, timeout=8) as res:
+    req = Request(
+        SYSUPGRADE_LATEST_URL,
+        headers={
+            "Accept": "application/json,text/plain;q=0.9,*/*;q=0.8",
+            "User-Agent": "openwrt-builder/1.0",
+        },
+    )
+    with urlopen(req, timeout=8) as res:
         text = res.read().decode("utf-8").strip()
     if not text:
         raise ValueError("empty_latest")
 
-    # Upstream may return either plain text ("24.10.2") or JSON payload.
-    if text.startswith("{"):
+    # Upstream may return JSON payload, JSON string, or plain text.
+    if text.startswith("{") or text.startswith("[") or text.startswith('"'):
         payload = json.loads(text)
-        if isinstance(payload, dict):
-            latest = payload.get("latest")
-            if isinstance(latest, str) and latest.strip():
-                return latest.strip()
+        latest = _extract_version_from_json(payload)
+        if latest:
+            return latest
         raise ValueError("invalid_latest_payload")
-    return text
+
+    latest = _extract_version_from_json(text)
+    if latest:
+        return latest
+    raise ValueError("invalid_latest_text")
 
 
 # =========================
