@@ -258,13 +258,28 @@ async function getListChoices() {
         .filter(Boolean);
 }
 
+async function getFileChoices() {
+    const rows = await apiJson(`${API}/files`);
+    return rows
+        .map((r) => {
+            const path = String(r.path || "").trim();
+            if (!path) return null;
+            return {
+                id: path,
+                title: path,
+                meta: typeof r.size === "number" ? `${r.size} bytes` : "",
+            };
+        })
+        .filter(Boolean);
+}
+
 function checkedValues(group) {
     return Array.from(document.querySelectorAll(`input[data-group="${group}"]:checked`))
         .map((elx) => elx.value);
 }
 
-function checklistHtml(group, options, selected) {
-    if (!options.length) return `<div class="muted">No lists available</div>`;
+function checklistHtml(group, options, selected, emptyText = "No items available") {
+    if (!options.length) return `<div class="muted">${escapeHtml(emptyText)}</div>`;
     const selectedSet = new Set(selected || []);
     return `
       <div class="checklist">
@@ -333,14 +348,21 @@ function hideProfilesEditor() {
     el("profiles-editor").innerHTML = "";
 }
 
-function profileEditorHtml(id, model, listOptions) {
+function profileEditorHtml(id, model, listOptions, fileOptions) {
     const profile = model?.profile || {};
     const selectedLists = Array.isArray(profile.lists) ? profile.lists : [];
+    const selectedFiles = Array.isArray(profile.files) ? profile.files : [];
     const includeText = arrayToLines(Array.isArray(profile.extra_include) ? profile.extra_include : []);
     const excludeText = arrayToLines(Array.isArray(profile.extra_exclude) ? profile.extra_exclude : []);
-    const filesText = arrayToLines(Array.isArray(profile.files) ? profile.files : []);
     const schemaVersion = Number(model?.schema_version) || 1;
     const name = model?.name || "";
+    const normalizedFileOptions = Array.isArray(fileOptions) ? fileOptions : [];
+    const mergedFileOptions = [
+        ...normalizedFileOptions,
+        ...selectedFiles
+            .filter((v) => !normalizedFileOptions.some((o) => o.id === v))
+            .map((v) => ({ id: v, title: v, meta: "missing on disk" })),
+    ];
 
     return `
     <h2>${id ? "Edit profile" : "Create profile"}</h2>
@@ -350,10 +372,10 @@ function profileEditorHtml(id, model, listOptions) {
       <div class="row"><label>profile_id (optional)</label><input id="profile-id" placeholder="slug" /></div>
     `}
     <div class="row"><label>name</label><input id="profile-name" value="${escapeAttr(name)}" /></div>
-    <div class="row"><label>lists</label>${checklistHtml("profile-lists", listOptions, selectedLists)}</div>
+    <div class="row"><label>lists</label>${checklistHtml("profile-lists", listOptions, selectedLists, "No lists available")}</div>
     <div class="row"><label>include (one per line)</label><textarea id="profile-include" rows="8">${escapeHtml(includeText)}</textarea></div>
     <div class="row"><label>exclude (one per line)</label><textarea id="profile-exclude" rows="8">${escapeHtml(excludeText)}</textarea></div>
-    <div class="row"><label>files (one per line)</label><textarea id="profile-files" rows="6">${escapeHtml(filesText)}</textarea></div>
+    <div class="row"><label>files</label>${checklistHtml("profile-files", mergedFileOptions, selectedFiles, "No files uploaded")}</div>
     <input id="profile-schema-version" type="hidden" value="${escapeAttr(schemaVersion)}" />
     <div class="row buttons">
       <button id="profile-save" type="button">Save</button>
@@ -365,14 +387,15 @@ function profileEditorHtml(id, model, listOptions) {
 
 async function openProfileEditor(id = null) {
     const listOptions = await getListChoices();
+    const fileOptions = await getFileChoices();
     if (id) {
         const obj = await apiJson(`${API}/profile/${encodeURIComponent(id)}`);
         const model = normalizeProfileTemplate(obj);
-        showProfilesEditor(profileEditorHtml(id, model, listOptions));
+        showProfilesEditor(profileEditorHtml(id, model, listOptions, fileOptions));
         wireProfileEditor(id);
     } else {
         const model = await getProfileTemplate();
-        showProfilesEditor(profileEditorHtml("", model, listOptions));
+        showProfilesEditor(profileEditorHtml("", model, listOptions, fileOptions));
         wireProfileEditor(null);
     }
 }
@@ -389,7 +412,7 @@ function wireProfileEditor(existingId) {
             const lists = checkedValues("profile-lists");
             const include = linesToArray(el("profile-include").value);
             const exclude = linesToArray(el("profile-exclude").value);
-            const files = linesToArray(el("profile-files").value);
+            const files = checkedValues("profile-files");
             const body = {
                 name,
                 schema_version: schemaVersion,
