@@ -26,7 +26,7 @@ import json
 import re
 from datetime import datetime
 from typing import Literal
-from urllib.request import Request, urlopen
+from urllib.request import Request as UrlRequest, urlopen
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -167,7 +167,7 @@ def _extract_version_from_json(value: object) -> str | None:
 
 
 def _load_sysupgrade_latest() -> str:
-    req = Request(
+    req = UrlRequest(
         SYSUPGRADE_LATEST_URL,
         headers={
             "Accept": "application/json,text/plain;q=0.9,*/*;q=0.8",
