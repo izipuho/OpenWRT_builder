@@ -124,8 +124,8 @@ class BaseRegistry:
 
         return {f"{self._config_type}_id": config_id, **out}
 
-    def delete(self, config_id: str) -> bool:
-        """Delete a config by ID and return deletion status."""
+    def delete(self, config_id: str) -> dict[str, Any]:
+        """Delete a config by ID and return deletion details."""
         path = self._configs_path / f"{config_id}.json"
         if not path.exists():
             raise FileNotFoundError(config_id)
