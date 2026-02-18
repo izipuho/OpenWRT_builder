@@ -3,10 +3,10 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
-ui_router = APIRouter(tags=["ui"])
+router = APIRouter(tags=["ui"])
 INDEX_HTML_PATH = Path("/ingress/index.html")
 
-@ui_router.get("/")
+@router.get("/")
 def index(request: Request):
     html = INDEX_HTML_PATH.read_text(encoding="utf-8")
     ingress_path = (request.headers.get("X-Ingress-Path") or "").strip()

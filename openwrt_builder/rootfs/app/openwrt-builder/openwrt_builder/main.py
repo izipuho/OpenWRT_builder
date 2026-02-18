@@ -6,10 +6,11 @@ import uvicorn
 from openwrt_builder.api.v1.builds import router as builds_router
 from openwrt_builder.env import env_path
 from openwrt_builder.api.v1.profiles import router as profiles_router
+from openwrt_builder.api.v1.files import router as files_router
 from openwrt_builder.service.builds_registry import BuildsRegistry
 from openwrt_builder.service.build_queue import BuildQueue
 from openwrt_builder.service.profiles_registry import ListsRegistry, ProfilesRegistry
-from openwrt_builder.api.ui import ui_router
+from openwrt_builder.api.ui import router as ui_router
 
 
 builds_dir = env_path("OPENWRT_BUILDER_BUILDS_DIR")
@@ -32,6 +33,7 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="/ingress/static"), name="static")
 app.mount("/examples", StaticFiles(directory="/usr/share/openwrt-builder/examples"), name="examples")
 app.include_router(profiles_router)
+app.include_router(files_router)
 app.include_router(builds_router)
 app.include_router(ui_router)
 

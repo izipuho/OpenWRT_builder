@@ -4,16 +4,16 @@ const API_BASE = API.replace(/\/api\/v1\/?$/, "");
 const el = (id) => document.getElementById(id);
 
 function setTab(tab) {
-    const isLists = tab === "lists";
-    el("tab-lists").classList.toggle("active", isLists);
-    el("tab-profiles").classList.toggle("active", !isLists);
-    el("view-lists").classList.toggle("hidden", !isLists);
-    el("view-profiles").classList.toggle("hidden", isLists);
+    ["lists", "profiles", "files"].forEach((name) => {
+        const active = tab === name;
+        el(`tab-${name}`).classList.toggle("active", active);
+        el(`view-${name}`).classList.toggle("hidden", !active);
+    });
 }
 
 async function apiJson(path, opts = {}) {
     const headers = { ...(opts.headers || {}) };
-    if (opts.body && !headers["Content-Type"]) {
+    if (opts.body && !(opts.body instanceof FormData) && !headers["Content-Type"]) {
         headers["Content-Type"] = "application/json";
     }
 
@@ -427,6 +427,75 @@ async function deleteProfile(id) {
     await refreshProfiles();
 }
 
+/* ---------------- Files ---------------- */
+
+function showFilesError(err = "") {
+    const msg = String(err || "").trim();
+    el("files-error").textContent = msg;
+    el("files-error").classList.toggle("hidden", !msg);
+}
+
+function renderFilesTable(rows) {
+    const html = `
+    <table>
+      <thead>
+        <tr><th>path</th><th>size</th><th>updated_at</th><th></th></tr>
+      </thead>
+      <tbody>
+        ${rows.map((r) => `
+          <tr>
+            <td>${escapeHtml(r.path ?? "")}</td>
+            <td>${escapeHtml(String(r.size ?? ""))}</td>
+            <td>${escapeHtml(r.updated_at ?? "")}</td>
+            <td class="actions">
+              <button type="button" data-act="del" data-path="${escapeAttr(r.path ?? "")}">Delete</button>
+            </td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `;
+    el("files-table").innerHTML = html;
+
+    el("files-table").querySelectorAll("button[data-act='del']").forEach((b) => {
+        b.addEventListener("click", async () => {
+            const path = b.getAttribute("data-path");
+            await deleteFile(path);
+        });
+    });
+}
+
+async function refreshFiles() {
+    showFilesError("");
+    const rows = await apiJson(`${API}/files`);
+    renderFilesTable(rows);
+}
+
+async function uploadFiles() {
+    showFilesError("");
+    const input = el("files-input");
+    const files = Array.from(input.files || []);
+    if (!files.length) {
+        showFilesError("Select at least one file");
+        return;
+    }
+
+    for (const file of files) {
+        const fd = new FormData();
+        fd.append("file", file, file.name);
+        await apiJson(`${API}/file`, { method: "POST", body: fd });
+    }
+
+    input.value = "";
+    await refreshFiles();
+}
+
+async function deleteFile(path) {
+    showFilesError("");
+    await apiJson(`${API}/file/${encodeURIComponent(path)}`, { method: "DELETE" });
+    await refreshFiles();
+}
+
 /* ---------------- Utils + boot ---------------- */
 
 function escapeHtml(s) {
@@ -445,16 +514,20 @@ function escapeAttr(s) {
 function boot() {
     el("tab-lists").addEventListener("click", () => setTab("lists"));
     el("tab-profiles").addEventListener("click", () => setTab("profiles"));
+    el("tab-files").addEventListener("click", () => setTab("files"));
 
     el("lists-refresh").addEventListener("click", () => refreshLists().catch(() => { }));
     el("lists-create").addEventListener("click", () => openListEditor(null).catch(() => { }));
 
     el("profiles-refresh").addEventListener("click", () => refreshProfiles().catch(() => { }));
     el("profiles-create").addEventListener("click", () => openProfileEditor(null).catch(() => { }));
+    el("files-refresh").addEventListener("click", () => refreshFiles().catch((e) => showFilesError(e.message || e)));
+    el("files-upload").addEventListener("click", () => uploadFiles().catch((e) => showFilesError(e.message || e)));
 
     setTab("lists");
     refreshLists().catch(() => { });
     refreshProfiles().catch(() => { });
+    refreshFiles().catch((e) => showFilesError(e.message || e));
 }
 
 boot();

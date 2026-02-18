@@ -51,8 +51,15 @@ body {
 
 .toolbar {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 8px;
     margin: 0 0 12px 0;
+}
+
+#files-input {
+    width: auto;
+    max-width: 380px;
 }
 
 button {

@@ -15,6 +15,7 @@
         <nav class="tabs">
             <button id="tab-lists" class="tab active" type="button">Lists</button>
             <button id="tab-profiles" class="tab" type="button">Profiles</button>
+            <button id="tab-files" class="tab" type="button">Files</button>
         </nav>
     </header>
 
@@ -35,6 +36,16 @@
             </div>
             <div id="profiles-table" class="table"></div>
             <div id="profiles-editor" class="editor hidden"></div>
+        </section>
+
+        <section id="view-files" class="view hidden">
+            <div class="toolbar">
+                <input id="files-input" type="file" multiple />
+                <button id="files-upload" type="button">Upload</button>
+                <button id="files-refresh" type="button">Refresh</button>
+            </div>
+            <div id="files-table" class="table"></div>
+            <pre id="files-error" class="error hidden"></pre>
         </section>
     </main>
 
