@@ -62,10 +62,12 @@ class BaseConfigModel(StrictModel):
 class ProfileModel(BaseConfigModel):
     """Profile record payload."""
 
+    profile_id: str | None = None
     profile: dict[str, Any]
 
 
 class ListModel(BaseConfigModel):
     """List record payload."""
 
+    list_id: str | None = None
     list: dict[str, Any]

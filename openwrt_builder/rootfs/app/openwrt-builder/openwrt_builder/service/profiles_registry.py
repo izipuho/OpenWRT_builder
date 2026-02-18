@@ -77,11 +77,11 @@ class BaseRegistry:
 
                     configs.append(
                         {
-                            f"{self._config_type}_id": path.stem,
                             **data,
+                            f"{self._config_type}_id": path.stem,
                         }
                     )
-                except (OSError, json.JSONDecodeError):
+                except (OSError, json.JSONDecodeError, ValueError):
                     continue
         configs.sort(key=lambda x: x["updated_at"])
         return configs
@@ -106,11 +106,15 @@ class BaseRegistry:
         if not path.exists():
             raise FileNotFoundError(config_id)
 
-        return {f"{self._config_type}_id": config_id, **self._load_validated(path)}
+        return {**self._load_validated(path), f"{self._config_type}_id": config_id}
 
     def create(self, full_config: dict[str, Any], config_id: str = None, force: bool = False) -> dict[str, Any]:
         """Create or update a config record and return it."""
-        full_config = self._validate_payload(full_config)
+        raw_config = dict(full_config)
+        full_config = self._validate_payload(raw_config)
+        payload_id_key = f"{self._config_type}_id"
+        payload_config_id = full_config.get(payload_id_key)
+        effective_config_id = config_id or payload_config_id
         name = full_config["name"]
         schema_version = full_config["schema_version"]
 
@@ -121,7 +125,7 @@ class BaseRegistry:
         if not isinstance(full_config[self._config_type], dict):
             raise ValueError(self._config_type)
 
-        config_id = config_id or full_config.get(f"{self._config_type}_id", self._slug(name))
+        config_id = effective_config_id or self._slug(name)
         if not isinstance(config_id, str) or not _JSON_ID_RE.match(config_id):
             raise ValueError(f"{self._config_type}_id")
 
@@ -136,7 +140,7 @@ class BaseRegistry:
 
         self._atomic_write_json(path, out)
 
-        return {f"{self._config_type}_id": config_id, **out}
+        return {**out, f"{self._config_type}_id": config_id}
 
     def delete(self, config_id: str) -> dict[str, Any]:
         """Delete a config by ID and return deletion details."""
