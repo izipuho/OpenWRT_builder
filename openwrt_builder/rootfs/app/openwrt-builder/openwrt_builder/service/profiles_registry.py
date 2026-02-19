@@ -137,8 +137,8 @@ class BaseRegistry:
             raise FileExistsError(config_id)
 
         out = {
-            "updated_at": self._now_z(),
             **full_config,
+            "updated_at": self._now_z(),
         }
 
         self._atomic_write_json(path, out)
