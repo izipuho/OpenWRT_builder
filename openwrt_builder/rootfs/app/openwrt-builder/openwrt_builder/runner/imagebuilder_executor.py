@@ -141,9 +141,13 @@ class ImageBuilderExecutor:
         target: str,
         subtarget: str,
         profile: str,
+        include_pkgs: list[str],
+        exclude_pkgs: list[str],
     ) -> Path:
         cfg_dir.mkdir(parents=True, exist_ok=True)
         cfg_path = cfg_dir / "config.mk"
+        include_value = " ".join(include_pkgs)
+        exclude_value = " ".join(exclude_pkgs)
         cfg_path.write_text(
             "\n".join(
                 [
@@ -151,6 +155,8 @@ class ImageBuilderExecutor:
                     f"TARGET = {target}",
                     f"SUBTARGET = {subtarget}",
                     f"PROFILE = {profile}",
+                    f"PACKAGES_INCLUDE = {include_value}",
+                    f"PACKAGES_EXCLUDE = {exclude_value}",
                     "",
                 ]
             ),
@@ -188,6 +194,8 @@ class ImageBuilderExecutor:
             target=target,
             subtarget=subtarget,
             profile=profile,
+            include_pkgs=include_pkgs,
+            exclude_pkgs=exclude_pkgs,
         )
         self._sync_files(self._files_dir, out_dir / "files")
 
@@ -197,8 +205,6 @@ class ImageBuilderExecutor:
             f"-j{jobs}",
             f"C={out_dir}",
             f"CACHE={cache_override}",
-            f"PACKAGES_INCLUDE={' '.join(include_pkgs)}",
-            f"PACKAGES_EXCLUDE={' '.join(exclude_pkgs)}",
             "image",
         ]
         if debug:

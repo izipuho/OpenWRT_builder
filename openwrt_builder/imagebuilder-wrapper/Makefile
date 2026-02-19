@@ -20,9 +20,6 @@ DEPS += $(shell [ ! -d ${files} ] || find ${files} -type f,l)
 DEPS += $(shell [ -d $C/files ] && find $C/files -type f,l)
 DEPS += ${CONFIGS}
 
-HOSTS ?= $C
-SCPOPTS = -O
-
 IMAGE ?= squashfs-sysupgrade.bin
 
 imagebuilder ?= openwrt-imagebuilder-${RELEASE}-${TARGET}-${SUBTARGET}.Linux-x86_64
@@ -57,8 +54,6 @@ ${CACHE}/${imagebuilder}.tar.xz: | ${CACHE}
 
 image: $C/${image}
 
-install = rsync --mkpath ${1} ${FILES}${2}
-
 ${FILES}:
 	mkdir ${FILES}
 	${FILES_INSTALL}
@@ -80,16 +75,5 @@ else
 	@echo ${BUILDDIR}
 endif
 
-copy: $C/${image}
-	$(foreach h,${HOSTS}, \
-		scp ${SCPOPTS} $< $h:/tmp & \
-	)
-
-install: $C/${image}
-	$(foreach h,${HOSTS}, ( \
-		scp ${SCPOPTS} $< $h:/tmp && \
-		ssh $h sysupgrade -v /tmp/${image} \
-	)& )
-
-.PHONY: copy listpks image
+.PHONY: listpks image
 .SECONDARY: ${BUILDDIR} ${BUILDDIR}/${imagebuilder} ${FILES}
