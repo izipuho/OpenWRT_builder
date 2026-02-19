@@ -35,6 +35,11 @@
                     <input id="builds-target" class="build-field" type="text" placeholder="target (e.g. ath79)" />
                     <input id="builds-subtarget" class="build-field" type="text" placeholder="subtarget (e.g. generic)" />
                     <select id="builds-version" class="build-field"></select>
+                    <select id="builds-images" class="build-field">
+                        <option value="sysupgrade" selected>sysupgrade</option>
+                        <option value="factory">factory</option>
+                        <option value="both">sysupgrade + factory</option>
+                    </select>
                 </div>
                 <div class="checklist build-options">
                     <label class="checkitem">

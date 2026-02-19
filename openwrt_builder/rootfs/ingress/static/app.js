@@ -1,5 +1,6 @@
 const API = "http://10.8.25.110:8080/api/v1";
-const API_BASE = API.replace(/\/api\/v1\/?$/, "");
+const API_BASE = API.replace(/\/api\/v1\/?$/, "").replace(/\/+$/, "");
+const EXAMPLES_BASE = `${API_BASE}/examples`;
 
 const templateCache = {
     list: null,
@@ -21,7 +22,6 @@ async function apiJson(path, opts = {}) {
     if (opts.body && !(opts.body instanceof FormData) && !headers["Content-Type"]) {
         headers["Content-Type"] = "application/json";
     }
-
     const res = await fetch(path, {
         ...opts,
         headers,
@@ -54,7 +54,8 @@ function normalizeListTemplate(obj = {}) {
 async function getTemplate({ cacheKey, examplePath, normalize, fallback }) {
     if (templateCache[cacheKey]) return templateCache[cacheKey];
     try {
-        const res = await fetch(`${API_BASE}${examplePath}`);
+        const rel = String(examplePath || "").replace(/^\/+/, "");
+        const res = await fetch(`${EXAMPLES_BASE}/${rel}`);
         if (!res.ok) throw new Error(`template_http_${res.status}`);
         templateCache[cacheKey] = normalize(await res.json());
     } catch (_) {
@@ -66,7 +67,7 @@ async function getTemplate({ cacheKey, examplePath, normalize, fallback }) {
 async function getListTemplate() {
     return getTemplate({
         cacheKey: "list",
-        examplePath: "/examples/list.json",
+        examplePath: "list.json",
         normalize: normalizeListTemplate,
         fallback: {
             name: "New list",
@@ -321,7 +322,7 @@ function normalizeProfileTemplate(obj = {}) {
 async function getProfileTemplate() {
     return getTemplate({
         cacheKey: "profile",
-        examplePath: "/examples/profile.json",
+        examplePath: "profile.json",
         normalize: normalizeProfileTemplate,
         fallback: {
             name: "New profile",
@@ -647,10 +648,53 @@ function renderBuildsTable(rows) {
             } else if (act === "delete") {
                 await deleteBuild(buildId);
             } else if (act === "download") {
-                window.open(`${API}/build/${encodeURIComponent(buildId)}/download`, "_blank");
+                await downloadBuild(buildId);
             }
         });
     });
+}
+
+function resolveOutputImages(imagesMode) {
+    const mode = String(imagesMode || "sysupgrade").trim();
+    if (mode === "factory") return ["factory"];
+    if (mode === "both") return ["sysupgrade", "factory"];
+    return ["sysupgrade"];
+}
+
+async function downloadBuild(buildId) {
+    showBuildsError("");
+    const items = await apiJson(`${API}/build/${encodeURIComponent(buildId)}/artifacts`);
+    if (!Array.isArray(items) || !items.length) {
+        showBuildsError(`No artifacts for build ${buildId}`);
+        return;
+    }
+
+    const preferred = items.find((item) => String(item?.role || "") === "primary") || items[0];
+    let selected = preferred;
+    if (items.length > 1) {
+        const options = items.map((item) => String(item?.id || "").trim()).filter(Boolean);
+        const pick = window.prompt(
+            `Select artifact id to download (${options.join(", ")})`,
+            String(preferred?.id || "")
+        );
+        if (pick === null) return;
+        const picked = items.find((item) => String(item?.id || "").trim() === String(pick).trim());
+        if (!picked) {
+            showBuildsError(`Unknown artifact id: ${pick}`);
+            return;
+        }
+        selected = picked;
+    }
+
+    const artifactId = String(selected?.id || "").trim();
+    if (!artifactId) {
+        showBuildsError(`Invalid artifact id for build ${buildId}`);
+        return;
+    }
+    window.open(
+        `${API}/build/${encodeURIComponent(buildId)}/download/${encodeURIComponent(artifactId)}`,
+        "_blank"
+    );
 }
 
 async function refreshBuilds() {
@@ -671,8 +715,10 @@ async function createBuild() {
     const target = el("builds-target").value.trim();
     const subtarget = el("builds-subtarget").value.trim();
     const version = el("builds-version").value.trim();
+    const imagesMode = el("builds-images").value;
     const forceRebuild = el("builds-force").checked;
     const debug = el("builds-debug").checked;
+    const outputImages = resolveOutputImages(imagesMode);
 
     if (!profileId) {
         showBuildsError("Select a profile");
@@ -702,6 +748,7 @@ async function createBuild() {
                 options: {
                     force_rebuild: forceRebuild,
                     debug,
+                    output_images: outputImages,
                 },
             },
         }),

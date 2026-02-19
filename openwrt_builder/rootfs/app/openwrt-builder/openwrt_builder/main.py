@@ -30,16 +30,16 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
 
     cors_origins_raw = env_str("OPENWRT_BUILDER_CORS_ORIGINS")
-    if cors_origins_raw:
-        cors_origins = [origin.strip() for origin in cors_origins_raw.split(",") if origin.strip()]
-        if cors_origins:
-            app.add_middleware(
-                CORSMiddleware,
-                allow_origins=cors_origins,
-                allow_credentials=False,
-                allow_methods=["*"],
-                allow_headers=["*"],
-            )
+    cors_origins = [origin.strip() for origin in (cors_origins_raw or "").split(",") if origin.strip()]
+    if not cors_origins:
+        cors_origins = ["*"]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     app.mount("/static", StaticFiles(directory="/ingress/static"), name="static")
     app.mount("/examples", StaticFiles(directory="/usr/share/openwrt-builder/examples"), name="examples")
