@@ -24,8 +24,8 @@ DEPS += ${CONFIGS}
 imagebuilder ?= openwrt-imagebuilder-${RELEASE}-${TARGET}-${SUBTARGET}.Linux-x86_64
 imagebuilder_archive ?= ${imagebuilder}.tar.zst
 
-ifndef PROFILE
-$(error PROFILE must be defined)
+ifndef PLATFORM
+$(error PLATFORM must be defined)
 endif
 
 IMAGES ?= sysupgrade
@@ -34,7 +34,7 @@ ifneq ($(strip $(INVALID_IMAGES)),)
 $(error unsupported IMAGES: $(INVALID_IMAGES))
 endif
 
-image_name = openwrt-${RELEASE}-${TARGET}-${SUBTARGET}-${PROFILE}-squashfs-$(1).bin
+image_name = openwrt-${RELEASE}-${TARGET}-${SUBTARGET}-${PLATFORM}-squashfs-$(1).bin
 OUT_IMAGES := $(foreach kind,$(IMAGES),$(call image_name,$(kind)))
 
 PACKAGES_INCLUDE ?=
@@ -73,7 +73,7 @@ files: ${FILES}
 
 $C/.images-built: ${BUILDDIR}/${imagebuilder} ${FILES} ${DEPS}
 	umask 022; $(MAKE) -C $< image \
-		PROFILE=${PROFILE} \
+		PROFILE=${PLATFORM} \
 		PACKAGES="${PACKAGES}" \
 		FILES=${FILES} \
 		CONFIG_DOWNLOAD_FOLDER=$(realpath ${CACHE})/${INSTRUCTION_SET}

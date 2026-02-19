@@ -206,7 +206,7 @@ class ImageBuilderExecutor:
         if path.exists():
             shutil.rmtree(path, ignore_errors=True)
 
-    def _resolve_profile(self, profile_id: str) -> tuple[str, list[str], list[str], list[str]]:
+    def _resolve_profile(self, profile_id: str) -> tuple[list[str], list[str], list[str]]:
         try:
             profile_payload = self._json_load(self._profiles_dir / f"{profile_id}.json")
         except FileNotFoundError as exc:
@@ -249,10 +249,7 @@ class ImageBuilderExecutor:
             raise ValueError("invalid_profile_files")
         selected_files = [self._safe_file_rel(str(path)) for path in raw_files]
 
-        # API has no dedicated field yet; allow explicit key in profile payload.
-        requested = profile.get("device_profile") or profile.get("platform")
-        device_profile = self._safe_make_arg("profile", str(requested or profile_id))
-        return device_profile, self._uniq(include), self._uniq(exclude), self._uniq(selected_files)
+        return self._uniq(include), self._uniq(exclude), self._uniq(selected_files)
 
     @staticmethod
     def _write_build_config(
@@ -261,7 +258,7 @@ class ImageBuilderExecutor:
         version: str,
         target: str,
         subtarget: str,
-        profile: str,
+        platform: str,
         include_pkgs: list[str],
         exclude_pkgs: list[str],
     ) -> Path:
@@ -275,7 +272,7 @@ class ImageBuilderExecutor:
                     f"RELEASE = {version}",
                     f"TARGET = {target}",
                     f"SUBTARGET = {subtarget}",
-                    f"PROFILE = {profile}",
+                    f"PLATFORM = {platform}",
                     f"PACKAGES_INCLUDE = {include_value}",
                     f"PACKAGES_EXCLUDE = {exclude_value}",
                     "",
@@ -305,10 +302,11 @@ class ImageBuilderExecutor:
         options = dict(request.get("options") or {})
 
         version = self._safe_part("version", str(request.get("version") or ""))
+        platform = self._safe_part("platform", str(request.get("platform") or ""))
         target = self._safe_part("target", str(request.get("target") or ""))
         subtarget = self._safe_part("subtarget", str(request.get("subtarget") or ""))
         profile_id = self._safe_part("profile_id", str(request.get("profile_id") or ""))
-        profile, include_pkgs, exclude_pkgs, selected_files = self._resolve_profile(profile_id)
+        include_pkgs, exclude_pkgs, selected_files = self._resolve_profile(profile_id)
         output_images = self._resolve_output_images(options)
         jobs = str(max(1, (os.cpu_count() or 1)))
         debug = bool(options.get("debug"))
@@ -320,9 +318,9 @@ class ImageBuilderExecutor:
         self._write_build_config(
             out_dir,
             version=version,
+            platform=platform,
             target=target,
             subtarget=subtarget,
-            profile=profile,
             include_pkgs=include_pkgs,
             exclude_pkgs=exclude_pkgs,
         )
@@ -368,7 +366,7 @@ class ImageBuilderExecutor:
 
             artifacts: list[dict[str, Any]] = []
             for image_kind in output_images:
-                image_name = f"openwrt-{version}-{target}-{subtarget}-{profile}-" f"{_IMAGE_SUFFIX[image_kind]}"
+                image_name = f"openwrt-{version}-{target}-{subtarget}-{platform}-" f"{_IMAGE_SUFFIX[image_kind]}"
                 artifact_src = out_dir / image_name
                 if not artifact_src.is_file():
                     raise RuntimeError(f"requested_image_not_built:{image_kind}")

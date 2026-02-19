@@ -43,6 +43,7 @@ class BuildRequestModel(StrictModel):
     """Build request payload persisted in build metadata."""
 
     profile_id: str
+    platform: str
     target: str
     subtarget: str
     version: str

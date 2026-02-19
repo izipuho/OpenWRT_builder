@@ -31,6 +31,7 @@ class BuildRequest(BaseModel):
     """Build request payload (the 'request' object)."""
 
     profile_id: str
+    platform: str
     target: str
     subtarget: str
     version: str

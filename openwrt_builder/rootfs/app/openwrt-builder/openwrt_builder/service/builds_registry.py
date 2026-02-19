@@ -121,8 +121,8 @@ class BuildsRegistry:
         """Create a new build or reuse an existing completed one.
 
         Args:
-            request: Build request payload containing a ``profile_id`` key and
-                optional ``options`` dict.
+            request: Build request payload containing ``profile_id``,
+                ``platform`` and optional ``options`` dict.
 
         Returns:
             Tuple of (build payload, created_flag) where ``created_flag`` is
@@ -130,7 +130,7 @@ class BuildsRegistry:
             completed build was reused.
 
         Raises:
-            ValueError: If ``profile_id`` is missing or invalid.
+            ValueError: If required request fields are missing or invalid.
             FileNotFoundError: If the profile does not exist.
         """
         try:

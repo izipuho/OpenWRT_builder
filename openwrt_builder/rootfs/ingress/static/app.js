@@ -713,6 +713,7 @@ async function refreshBuilds() {
 async function createBuild() {
     showBuildsError("");
     const profileId = el("builds-profile").value.trim();
+    const platform = el("builds-platform").value.trim();
     const target = el("builds-target").value.trim();
     const subtarget = el("builds-subtarget").value.trim();
     const version = el("builds-version").value.trim();
@@ -723,6 +724,10 @@ async function createBuild() {
 
     if (!profileId) {
         showBuildsError("Select a profile");
+        return;
+    }
+    if (!platform) {
+        showBuildsError("Platform is required");
         return;
     }
     if (!target) {
@@ -743,6 +748,7 @@ async function createBuild() {
         body: JSON.stringify({
             request: {
                 profile_id: profileId,
+                platform,
                 target,
                 subtarget,
                 version,
