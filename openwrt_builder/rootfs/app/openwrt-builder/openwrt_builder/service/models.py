@@ -3,9 +3,21 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 BuildState = Literal["queued", "running", "done", "failed", "canceled"]
+ImageKind = Literal["sysupgrade", "factory"]
+ArtifactType = Literal["firmware", "metadata"]
+ArtifactRole = Literal["primary", "optional", "checksum", "manifest"]
+
+
+def validate_output_images(values: list[ImageKind]) -> list[ImageKind]:
+    """Validate `output_images` option shape."""
+    if not values:
+        raise ValueError("invalid_output_images")
+    if len(set(values)) != len(values):
+        raise ValueError("invalid_output_images")
+    return values
 
 
 class StrictModel(BaseModel):
@@ -19,6 +31,12 @@ class BuildOptionsModel(StrictModel):
 
     force_rebuild: bool = False
     debug: bool = False
+    output_images: list[ImageKind] = Field(default_factory=lambda: ["sysupgrade"])
+
+    @field_validator("output_images")
+    @classmethod
+    def _validate_output_images(cls, values: list[ImageKind]) -> list[ImageKind]:
+        return validate_output_images(values)
 
 
 class BuildRequestModel(StrictModel):
@@ -31,10 +49,21 @@ class BuildRequestModel(StrictModel):
     options: BuildOptionsModel = Field(default_factory=BuildOptionsModel)
 
 
+class BuildArtifactModel(StrictModel):
+    """Single artifact produced by a build."""
+
+    id: str
+    name: str
+    path: str
+    size: int = Field(ge=0)
+    type: ArtifactType
+    role: ArtifactRole
+
+
 class BuildResultModel(StrictModel):
     """Build execution result metadata."""
 
-    path: str
+    artifacts: list[BuildArtifactModel] = Field(min_length=1)
 
 
 class BuildModel(StrictModel):

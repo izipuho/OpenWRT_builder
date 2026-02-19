@@ -15,6 +15,10 @@ from typing import Any
 _SAFE_VALUE_RE = re.compile(r"^[A-Za-z0-9_.@:+\-/]+$")
 _SAFE_PART_RE = re.compile(r"^[A-Za-z0-9_.+-]+$")
 _SAFE_PKG_RE = re.compile(r"^[A-Za-z0-9_.+-]+$")
+_IMAGE_SUFFIX = {
+    "sysupgrade": "squashfs-sysupgrade.bin",
+    "factory": "squashfs-factory.bin",
+}
 
 
 class BuildCanceled(RuntimeError):
@@ -52,18 +56,6 @@ class ImageBuilderExecutor:
         return value
 
     @staticmethod
-    def _pick_artifact(output_dir: Path) -> Path:
-        preferred = [".bin", ".img.gz", ".tar.gz", ".itb", ".trx"]
-        files = sorted(p for p in output_dir.rglob("*") if p.is_file())
-        if not files:
-            raise RuntimeError("artifact_not_found")
-        for suffix in preferred:
-            for file in files:
-                if file.name.endswith(suffix):
-                    return file
-        return files[0]
-
-    @staticmethod
     def _safe_part(name: str, value: str) -> str:
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"invalid_{name}")
@@ -80,6 +72,13 @@ class ImageBuilderExecutor:
         if not _SAFE_PKG_RE.match(name):
             raise ValueError("invalid_package_name")
         return name
+
+    @staticmethod
+    def _safe_image_kind(kind: str) -> str:
+        value = str(kind or "").strip()
+        if value not in _IMAGE_SUFFIX:
+            raise ValueError("invalid_output_images")
+        return value
 
     @staticmethod
     def _uniq(values: list[str]) -> list[str]:
@@ -101,6 +100,20 @@ class ImageBuilderExecutor:
         if any(part in {"", ".", ".."} for part in parts):
             raise ValueError("invalid_profile_file_path")
         return "/".join(parts)
+
+    def _resolve_output_images(self, options: dict[str, Any]) -> list[str]:
+        raw = options.get("output_images")
+        if raw is None:
+            return ["sysupgrade"]
+        if not isinstance(raw, list):
+            raise ValueError("invalid_output_images")
+        if not raw:
+            raise ValueError("invalid_output_images")
+        values = [self._safe_image_kind(str(item)) for item in raw]
+        values = self._uniq(values)
+        if not values:
+            raise ValueError("invalid_output_images")
+        return values
 
     @staticmethod
     def _json_load(path: Path) -> dict[str, Any]:
@@ -278,6 +291,7 @@ class ImageBuilderExecutor:
         subtarget = self._safe_part("subtarget", str(request.get("subtarget") or ""))
         profile_id = self._safe_part("profile_id", str(request.get("profile_id") or ""))
         profile, include_pkgs, exclude_pkgs, selected_files = self._resolve_profile(profile_id)
+        output_images = self._resolve_output_images(options)
         jobs = str(max(1, (os.cpu_count() or 1)))
         debug = bool(options.get("debug"))
         if not (self._wrapper_dir / "Makefile").exists():
@@ -304,6 +318,7 @@ class ImageBuilderExecutor:
             f"C={out_dir}",
             f"CACHE={cache_override}",
             f"BUILDDIR_HINT_FILE={builddir_hint}",
+            f"IMAGES={' '.join(output_images)}",
             "image",
         ]
         if debug:
@@ -333,12 +348,28 @@ class ImageBuilderExecutor:
                 message = stderr_tail or stdout_tail or f"make_failed:{proc.returncode}"
                 raise RuntimeError(message.strip())
 
-            artifact_src = self._pick_artifact(out_dir)
-            artifact_dst = build_root / f"{build_id}{artifact_src.suffix}"
-            shutil.copy2(artifact_src, artifact_dst)
-            if artifact_src.exists():
-                artifact_src.unlink()
-            return {"path": str(artifact_dst)}
+            artifacts: list[dict[str, Any]] = []
+            for image_kind in output_images:
+                image_name = f"openwrt-{version}-{target}-{subtarget}-{profile}-" f"{_IMAGE_SUFFIX[image_kind]}"
+                artifact_src = out_dir / image_name
+                if not artifact_src.is_file():
+                    raise RuntimeError(f"requested_image_not_built:{image_kind}")
+                artifact_dst = build_root / image_name
+                artifact_dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(artifact_src, artifact_dst)
+                artifacts.append(
+                    {
+                        "id": image_kind,
+                        "name": image_name,
+                        "path": str(artifact_dst),
+                        "size": artifact_dst.stat().st_size,
+                        "type": "firmware",
+                        "role": "primary" if image_kind == "sysupgrade" else "optional",
+                    }
+                )
+            if artifacts and artifacts[0]["role"] != "primary":
+                artifacts[0]["role"] = "primary"
+            return {"artifacts": artifacts}
         finally:
             if proc is not None and proc.poll() is None:
                 self._terminate_process(proc)

@@ -29,6 +29,10 @@ class BuildsService:
         """Request build cancellation using registry-defined semantics."""
         return self._registry.cancel_build(build_id)
 
-    def get_build_download(self, build_id: str) -> str:
+    def list_build_artifacts(self, build_id: str) -> list[dict[str, Any]]:
+        """Return artifact metadata for a completed build."""
+        return self._registry.list_build_artifacts(build_id)
+
+    def get_build_download(self, build_id: str, artifact_id: str) -> str:
         """Return absolute artifact path for a completed build."""
-        return self._registry.get_build_download(build_id)
+        return self._registry.get_build_download(build_id, artifact_id)

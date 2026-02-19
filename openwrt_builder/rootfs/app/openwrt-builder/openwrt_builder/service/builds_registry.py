@@ -198,11 +198,35 @@ class BuildsRegistry:
             return True
         return False
 
-    def get_build_download(self, build_id: str) -> str:
+    @staticmethod
+    def _result_artifacts(result: dict[str, Any]) -> list[dict[str, Any]]:
+        artifacts = result.get("artifacts")
+        if not isinstance(artifacts, list):
+            return []
+        out: list[dict[str, Any]] = []
+        for item in artifacts:
+            if not isinstance(item, dict):
+                continue
+            out.append(item)
+        return out
+
+    def list_build_artifacts(self, build_id: str) -> list[dict[str, Any]]:
+        """Return artifact metadata for a completed build."""
+        build = self._read_build(build_id)
+        if build.get("state") != "done":
+            raise PermissionError(build_id)
+        result = build.get("result") or {}
+        artifacts = self._result_artifacts(result)
+        if not artifacts:
+            raise FileNotFoundError(build_id)
+        return artifacts
+
+    def get_build_download(self, build_id: str, artifact_id: str) -> str:
         """Return the filesystem path to a completed build artifact.
 
         Args:
             build_id: Identifier for the build.
+            artifact_id: Requested artifact identifier.
 
         Returns:
             Path to the build artifact on disk.
@@ -215,11 +239,17 @@ class BuildsRegistry:
         if build.get("state") != "done":
             raise PermissionError(build_id)
         result = build.get("result") or {}
-        path = result.get("path")
+        path: str | None = None
+        for artifact in self._result_artifacts(result):
+            if str(artifact.get("id") or "") == artifact_id:
+                candidate = artifact.get("path")
+                if isinstance(candidate, str) and candidate:
+                    path = candidate
+                break
         if not path:
-            raise FileNotFoundError(build_id)
+            raise FileNotFoundError(artifact_id)
         if not Path(path).exists():
-            raise FileNotFoundError(build_id)
+            raise FileNotFoundError(artifact_id)
         return path
 
     def delete_build(self, build_id: str) -> bool:
@@ -235,17 +265,22 @@ class BuildsRegistry:
             self._queue.remove(build_id)
 
         result = build.get("result") or {}
-        artifact_path = result.get("path")
-        if isinstance(artifact_path, str) and artifact_path:
+        artifacts = self._result_artifacts(result)
+        artifact_dir: Path | None = None
+        for item in artifacts:
+            artifact_path = item.get("path")
+            if not isinstance(artifact_path, str) or not artifact_path:
+                continue
             artifact = Path(artifact_path)
             if artifact.exists():
                 try:
                     artifact.unlink()
                 except OSError:
                     pass
-            artifact_dir = artifact.parent
-            if artifact_dir.name == build_id and artifact_dir.exists():
-                shutil.rmtree(artifact_dir, ignore_errors=True)
+            if artifact.parent.name == build_id:
+                artifact_dir = artifact.parent
+        if artifact_dir is not None and artifact_dir.exists():
+            shutil.rmtree(artifact_dir, ignore_errors=True)
 
         self._build_path(build_id).unlink()
         return True

@@ -21,14 +21,20 @@ DEPS += $(shell [ ! -d ${files} ] || find ${files} -type f,l)
 DEPS += $(shell [ -d $C/files ] && find $C/files -type f,l)
 DEPS += ${CONFIGS}
 
-IMAGE ?= squashfs-sysupgrade.bin
-
 imagebuilder ?= openwrt-imagebuilder-${RELEASE}-${TARGET}-${SUBTARGET}.Linux-x86_64
 
 ifndef PROFILE
 $(error PROFILE must be defined)
 endif
-image ?= openwrt-${RELEASE}-${TARGET}-${SUBTARGET}-${PROFILE}-${IMAGE}
+
+IMAGES ?= sysupgrade
+INVALID_IMAGES := $(filter-out sysupgrade factory,$(IMAGES))
+ifneq ($(strip $(INVALID_IMAGES)),)
+$(error unsupported IMAGES: $(INVALID_IMAGES))
+endif
+
+image_name = openwrt-${RELEASE}-${TARGET}-${SUBTARGET}-${PROFILE}-squashfs-$(1).bin
+OUT_IMAGES := $(foreach kind,$(IMAGES),$(call image_name,$(kind)))
 
 PACKAGES_INCLUDE ?=
 PACKAGES_EXCLUDE ?=
@@ -54,7 +60,7 @@ ${BUILDDIR}/${imagebuilder}: ${CACHE}/${imagebuilder}.tar.xz ${BUILDDIR}
 ${CACHE}/${imagebuilder}.tar.xz: | ${CACHE}
 	curl --remote-name --continue-at - --output-dir $| ${DOWNLOADS_BASE}/${@F}
 
-image: $C/${image}
+image: ${OUT_IMAGES:%=$C/%}
 
 ${FILES}:
 	mkdir ${FILES}
@@ -64,19 +70,26 @@ ${FILES}:
 files: ${FILES}
 
 
-$C/${image}: ${BUILDDIR}/${imagebuilder} ${FILES} ${DEPS}
+$C/.images-built: ${BUILDDIR}/${imagebuilder} ${FILES} ${DEPS}
 	umask 022; $(MAKE) -C $< image \
 		PROFILE=${PROFILE} \
 		PACKAGES="${PACKAGES}" \
 		FILES=${FILES} \
 		CONFIG_DOWNLOAD_FOLDER=$(realpath ${CACHE})/${INSTRUCTION_SET}
-	cp ${BUILDDIR}/${imagebuilder}/bin/targets/${TARGET}/${SUBTARGET}/${image} $@
+	@set -e; \
+	for kind in ${IMAGES}; do \
+		name="$(call image_name,$$kind)"; \
+		cp ${BUILDDIR}/${imagebuilder}/bin/targets/${TARGET}/${SUBTARGET}/$$name $C/$$name; \
+	done
+	touch $@
 ifndef LEAVE_BUILD
 	rm -rf ${BUILDDIR}
 	rm -f ${BUILDDIR_HINT_FILE}
 else
 	@echo ${BUILDDIR}
 endif
+
+$C/${OUT_IMAGES}: $C/.images-built
 
 .PHONY: listpks image
 .SECONDARY: ${BUILDDIR} ${BUILDDIR}/${imagebuilder} ${FILES}

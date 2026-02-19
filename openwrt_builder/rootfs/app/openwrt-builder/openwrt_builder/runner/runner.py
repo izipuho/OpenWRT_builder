@@ -85,7 +85,7 @@ class BuildRunner:
             queue: Persistent build queue.
             executor: Callable that performs the build.
                 Input: build dict
-                Output: dict with at least {"path": "<artifact-path>"} on success.
+                Output: dict with {"artifacts": [...]} on success.
         """
         self._cfg = cfg
         self._queue = queue

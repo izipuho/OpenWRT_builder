@@ -2,11 +2,16 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-BuildState = Literal["queued", "running", "done", "failed", "canceled"]
+from openwrt_builder.service.models import (
+    ArtifactRole,
+    ArtifactType,
+    BuildState,
+    ImageKind,
+    validate_output_images,
+)
 
 
 class BuildOptions(BaseModel):
@@ -14,6 +19,12 @@ class BuildOptions(BaseModel):
 
     force_rebuild: bool = False
     debug: bool = False
+    output_images: list[ImageKind] = Field(default_factory=lambda: ["sysupgrade"])
+
+    @field_validator("output_images")
+    @classmethod
+    def _validate_output_images(cls, values: list[ImageKind]) -> list[ImageKind]:
+        return validate_output_images(values)
 
 
 class BuildRequest(BaseModel):
@@ -45,10 +56,21 @@ class BuildSummaryOut(BaseModel):
     runner_pid: int | None = None
 
 
+class BuildArtifactOut(BaseModel):
+    """Single build artifact."""
+
+    id: str
+    name: str
+    path: str
+    size: int = Field(ge=0)
+    type: ArtifactType
+    role: ArtifactRole
+
+
 class BuildResultOut(BaseModel):
     """Build result payload."""
 
-    path: str
+    artifacts: list[BuildArtifactOut] = Field(min_length=1)
 
 
 class BuildOut(BuildSummaryOut):

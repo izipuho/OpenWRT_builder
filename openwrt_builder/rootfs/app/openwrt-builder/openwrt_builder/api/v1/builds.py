@@ -7,7 +7,8 @@ This module defines the HTTP contract for "build" objects:
 - GET  /api/v1/build/{id}
 - POST /api/v1/build/{id}/cancel
 - DELETE /api/v1/build/{id}
-- GET  /api/v1/build/{id}/download
+- GET  /api/v1/build/{id}/artifacts
+- GET  /api/v1/build/{id}/download/{artifact_id}
 
 HTTP layer responsibilities:
 - Parse and validate request payloads (structure + types)
@@ -40,6 +41,7 @@ from openwrt_builder.api.builds_errors import (
     map_get_build_error,
 )
 from openwrt_builder.api.builds_schemas import (
+    BuildArtifactOut,
     BuildCreateIn,
     BuildOut,
     BuildSummaryOut,
@@ -79,8 +81,11 @@ SYSUPGRADE_LATEST_URL = "https://sysupgrade.openwrt.org/api/v1/latest"
 #       Raises FileNotFoundError if build not found.
 #       Raises PermissionError if build is running.
 #
-#   get_build_download(build_id: str) -> str
-#       Returns filesystem path for artifact download.
+#   list_build_artifacts(build_id: str) -> list[dict]
+#       Returns produced artifact metadata.
+#
+#   get_build_download(build_id: str, artifact_id: str) -> str
+#       Returns filesystem path for a specific artifact download.
 #       Raises FileNotFoundError if artifact/build not found.
 #       Raises PermissionError if build is not ready (not done).
 #
@@ -207,8 +212,27 @@ def delete_build(req: Request, build_id: str):
     return {"deleted": True}
 
 
-@router.get("/build/{build_id}/download")
-def download_build(req: Request, build_id: str):
+@router.get("/build/{build_id}/artifacts", response_model=list[BuildArtifactOut])
+def get_build_artifacts(req: Request, build_id: str):
+    """List artifacts of a completed build."""
+    reg = req.app.state.builds_registry
+
+    try:
+        items = reg.list_build_artifacts(build_id)
+    except (ValueError, FileNotFoundError, PermissionError) as e:
+        raise map_download_build_error(e)
+
+    out: list[BuildArtifactOut] = []
+    for item in items:
+        try:
+            out.append(BuildArtifactOut.model_validate(item))
+        except ValidationError:
+            continue
+    return out
+
+
+@router.get("/build/{build_id}/download/{artifact_id}")
+def download_build(req: Request, build_id: str, artifact_id: str):
     """
     Download build artifact.
 
@@ -220,12 +244,13 @@ def download_build(req: Request, build_id: str):
     reg = req.app.state.builds_registry
 
     try:
-        path = reg.get_build_download(build_id)
+        path = reg.get_build_download(build_id, artifact_id)
     except (ValueError, FileNotFoundError, PermissionError) as e:
         raise map_download_build_error(e)
 
+    filename = path.rsplit("/", 1)[-1] or artifact_id
     return FileResponse(
         path=path,
         media_type="application/octet-stream",
-        filename=f"{build_id}.tar.gz",
+        filename=filename,
     )
