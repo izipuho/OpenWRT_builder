@@ -1,7 +1,7 @@
 // const API = "http://10.8.25.110:8080/api/v1";
-const API = "/api/v1"
-const API_BASE = API.replace(/\/api\/v1\/?$/, "").replace(/\/+$/, "");
-const EXAMPLES_BASE = `${API_BASE}/examples`;
+// Keep paths ingress-relative (no leading slash), so requests stay under HA ingress prefix.
+const API = "api/v1";
+const EXAMPLES_BASE = "examples";
 
 const templateCache = {
     list: null,
