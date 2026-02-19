@@ -7,6 +7,7 @@ endif
 include $C/config.mk
 
 BUILDDIR := $(shell mktemp --dry-run --directory -t imgbldr-XXXXX)
+BUILDDIR_HINT_FILE ?= $C/.imgbuilder_builddir
 
 FILES = ${BUILDDIR}/files
 files = files
@@ -43,6 +44,7 @@ ${CACHE}:
 
 ${BUILDDIR}:
 	mkdir --parents $@
+	printf '%s\n' "$@" > ${BUILDDIR_HINT_FILE}
 
 imagebuilder: ${BUILDDIR}/${imagebuilder}
 
@@ -71,6 +73,7 @@ $C/${image}: ${BUILDDIR}/${imagebuilder} ${FILES} ${DEPS}
 	cp ${BUILDDIR}/${imagebuilder}/bin/targets/${TARGET}/${SUBTARGET}/${image} $@
 ifndef LEAVE_BUILD
 	rm -rf ${BUILDDIR}
+	rm -f ${BUILDDIR_HINT_FILE}
 else
 	@echo ${BUILDDIR}
 endif

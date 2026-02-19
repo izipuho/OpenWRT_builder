@@ -24,6 +24,7 @@ from pydantic import ValidationError
 from openwrt_builder.service.build_queue import BuildQueue
 from openwrt_builder.service.models import BuildModel, BuildResultModel
 from openwrt_builder.service.profiles_registry import BaseRegistry
+from openwrt_builder.runner.imagebuilder_executor import BuildCanceled
 
 
 @dataclass(frozen=True)
@@ -218,6 +219,13 @@ class BuildRunner:
                         continue
 
                     build = self._set_state(build, state="done", progress=100, message=None, result=result, runner_pid=None)
+                    self._write_build(build_id, build)
+                except BuildCanceled:
+                    try:
+                        build = self._read_build(build_id)
+                    except (FileNotFoundError, json.JSONDecodeError, ValidationError):
+                        continue
+                    build = self._set_state(build, state="canceled", message="canceled", runner_pid=None)
                     self._write_build(build_id, build)
                 except Exception as e:
                     try:

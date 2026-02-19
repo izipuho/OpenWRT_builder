@@ -4,8 +4,10 @@ from __future__ import annotations
 import json
 import os
 import re
+import signal
 import shutil
 import subprocess
+import time
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +15,10 @@ from typing import Any
 _SAFE_VALUE_RE = re.compile(r"^[A-Za-z0-9_.@:+\-/]+$")
 _SAFE_PART_RE = re.compile(r"^[A-Za-z0-9_.+-]+$")
 _SAFE_PKG_RE = re.compile(r"^[A-Za-z0-9_.+-]+$")
+
+
+class BuildCanceled(RuntimeError):
+    """Build execution canceled by user request."""
 
 
 class ImageBuilderExecutor:
@@ -105,6 +111,75 @@ class ImageBuilderExecutor:
         if not isinstance(data, dict):
             raise ValueError("invalid_json_payload")
         return data
+
+    @staticmethod
+    def _tail_file(path: Path, limit: int = 3000) -> str:
+        if not path.exists():
+            return ""
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return ""
+        return text[-limit:]
+
+    def _is_cancel_requested(self, build_id: str) -> bool:
+        build_path = self._builds_dir / f"{build_id}.json"
+        if not build_path.exists():
+            return False
+        try:
+            with build_path.open("r", encoding="utf-8") as f:
+                payload = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return False
+        if not isinstance(payload, dict):
+            return False
+        return bool(payload.get("cancel_requested"))
+
+    @staticmethod
+    def _terminate_process(proc: subprocess.Popen[str], timeout_sec: float = 5.0) -> None:
+        if proc.poll() is not None:
+            return
+        try:
+            os.killpg(proc.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            return
+        except OSError:
+            try:
+                proc.terminate()
+            except OSError:
+                return
+        end_time = time.monotonic() + timeout_sec
+        while proc.poll() is None and time.monotonic() < end_time:
+            time.sleep(0.1)
+        if proc.poll() is not None:
+            return
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except OSError:
+            try:
+                proc.kill()
+            except OSError:
+                return
+
+    @staticmethod
+    def _cleanup_workspace(path: Path) -> None:
+        if path.exists():
+            shutil.rmtree(path, ignore_errors=True)
+
+    @staticmethod
+    def _cleanup_temp_builddir_from_hint(hint_path: Path) -> None:
+        try:
+            raw = hint_path.read_text(encoding="utf-8", errors="replace").strip()
+        except OSError:
+            return
+        if not raw:
+            return
+        path = Path(raw)
+        # Safety guard: cleanup only expected ImageBuilder temp dirs.
+        if not path.name.startswith("imgbldr-"):
+            return
+        if path.exists():
+            shutil.rmtree(path, ignore_errors=True)
 
     def _resolve_profile(self, profile_id: str) -> tuple[str, list[str], list[str], list[str]]:
         profile_payload = self._json_load(self._profiles_dir / f"{profile_id}.json")
@@ -222,32 +297,50 @@ class ImageBuilderExecutor:
         self._sync_files(self._files_dir, out_dir / "files", selected_files)
 
         cache_override = self._cache_dir / "imagebuilder" / version
+        builddir_hint = out_dir / ".imgbuilder_builddir"
         cmd = [
             "make",
             f"-j{jobs}",
             f"C={out_dir}",
             f"CACHE={cache_override}",
+            f"BUILDDIR_HINT_FILE={builddir_hint}",
             "image",
         ]
         if debug:
             cmd.append("V=s")
 
-        proc = subprocess.run(
-            cmd,
-            cwd=self._wrapper_dir,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        if proc.returncode != 0:
-            stderr_tail = (proc.stderr or "")[-3000:]
-            stdout_tail = (proc.stdout or "")[-3000:]
-            message = stderr_tail or stdout_tail or f"make_failed:{proc.returncode}"
-            raise RuntimeError(message.strip())
+        stdout_log = out_dir / "stdout.log"
+        stderr_log = out_dir / "stderr.log"
+        proc: subprocess.Popen[str] | None = None
+        try:
+            with stdout_log.open("w", encoding="utf-8") as out_f, stderr_log.open("w", encoding="utf-8") as err_f:
+                proc = subprocess.Popen(
+                    cmd,
+                    cwd=self._wrapper_dir,
+                    text=True,
+                    stdout=out_f,
+                    stderr=err_f,
+                    preexec_fn=os.setsid,
+                )
+                while proc.poll() is None:
+                    if self._is_cancel_requested(build_id):
+                        raise BuildCanceled("canceled")
+                    time.sleep(0.2)
 
-        artifact_src = self._pick_artifact(out_dir)
-        artifact_dst = build_root / f"{build_id}{artifact_src.suffix}"
-        shutil.copy2(artifact_src, artifact_dst)
-        if artifact_src.exists():
-            artifact_src.unlink()
-        return {"path": str(artifact_dst)}
+            if proc.returncode != 0:
+                stderr_tail = self._tail_file(stderr_log)
+                stdout_tail = self._tail_file(stdout_log)
+                message = stderr_tail or stdout_tail or f"make_failed:{proc.returncode}"
+                raise RuntimeError(message.strip())
+
+            artifact_src = self._pick_artifact(out_dir)
+            artifact_dst = build_root / f"{build_id}{artifact_src.suffix}"
+            shutil.copy2(artifact_src, artifact_dst)
+            if artifact_src.exists():
+                artifact_src.unlink()
+            return {"path": str(artifact_dst)}
+        finally:
+            if proc is not None and proc.poll() is None:
+                self._terminate_process(proc)
+            self._cleanup_temp_builddir_from_hint(builddir_hint)
+            self._cleanup_workspace(out_dir)
