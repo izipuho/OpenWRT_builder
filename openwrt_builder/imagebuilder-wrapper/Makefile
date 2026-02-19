@@ -6,7 +6,7 @@ endif
 
 include $C/config.mk
 
-BUILDDIR := $(shell mktemp --dry-run --directory -t imgbldr-XXXXX)
+BUILDDIR := $(shell mktemp -d -t imgbldr.XXXXXX 2>/dev/null || mktemp -d /tmp/imgbldr.XXXXXX)
 BUILDDIR_HINT_FILE ?= $C/.imgbuilder_builddir
 
 FILES = ${BUILDDIR}/files
@@ -55,7 +55,7 @@ ${BUILDDIR}:
 imagebuilder: ${BUILDDIR}/${imagebuilder}
 
 ${BUILDDIR}/${imagebuilder}: ${CACHE}/${imagebuilder}.tar.xz ${BUILDDIR}
-	tar --touch -C ${BUILDDIR} -xf $<
+	tar -C ${BUILDDIR} -xf $<
 
 ${CACHE}/${imagebuilder}.tar.xz: | ${CACHE}
 	curl --remote-name --continue-at - --output-dir $| ${DOWNLOADS_BASE}/${@F}
