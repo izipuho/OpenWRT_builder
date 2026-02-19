@@ -26,6 +26,7 @@ class BuildRequestModel(StrictModel):
 
     profile_id: str
     target: str
+    subtarget: str
     version: str
     options: BuildOptionsModel = Field(default_factory=BuildOptionsModel)
 

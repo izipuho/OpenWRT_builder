@@ -7,7 +7,6 @@ endif
 include $C/config.mk
 
 BUILDDIR := $(shell mktemp --dry-run --directory -t imgbldr-XXXXX)
-BASEDIR := $(dir $(realpath $(firstword ${MAKEFILE_LIST})))
 
 FILES = ${BUILDDIR}/files
 files = files
@@ -16,8 +15,8 @@ CACHE = cache/${RELEASE}
 DOWNLOADS_BASE = https://downloads.openwrt.org/releases/${RELEASE}/targets/${TARGET}/${SUBTARGET}
 INSTRUCTION_SET = $(shell curl --silent ${DOWNLOADS_BASE}/profiles.json | jq --raw-output .arch_packages)
 
-CONFIGS = config.mk $C/config.mk
-DEPS += $(shell find ${files} -type f,l)
+CONFIGS = $(wildcard config.mk) $C/config.mk
+DEPS += $(shell [ ! -d ${files} ] || find ${files} -type f,l)
 DEPS += $(shell [ -d $C/files ] && find $C/files -type f,l)
 DEPS += ${CONFIGS}
 
@@ -28,16 +27,14 @@ IMAGE ?= squashfs-sysupgrade.bin
 
 imagebuilder ?= openwrt-imagebuilder-${RELEASE}-${TARGET}-${SUBTARGET}.Linux-x86_64
 
-image ?= openwrt-${RELEASE}-${TARGET}-${SUBTARGET}-${PLATFORM}-${IMAGE}
+ifndef PROFILE
+$(error PROFILE must be defined)
+endif
+image ?= openwrt-${RELEASE}-${TARGET}-${SUBTARGET}-${PROFILE}-${IMAGE}
 
-comment = \#%
-parts = $(filter-out ${comment}, $(foreach f,$1,$(file < ${BASEDIR}/lists/$f)))
-PACKAGES = \
-	$(addprefix -,$(call parts,${REMOVE_LISTS})) \
-	$(addprefix -,$(foreach p,${REMOVE_PKGS},$p)) \
-	$(call parts,${INSTALL_LISTS}) \
-	$(filter-out ${comment}, $(foreach p,${INSTALL_PKGS},$p))
-#	$(foreach p,${INSTALL_PKGS},$p)
+PACKAGES_INCLUDE ?=
+PACKAGES_EXCLUDE ?=
+PACKAGES := $(addprefix -,${PACKAGES_EXCLUDE}) ${PACKAGES_INCLUDE}
 
 all: image
 
@@ -72,7 +69,7 @@ files: ${FILES}
 
 $C/${image}: ${BUILDDIR}/${imagebuilder} ${FILES} ${DEPS}
 	umask 022; $(MAKE) -C $< image \
-		PROFILE=${PLATFORM} \
+		PROFILE=${PROFILE} \
 		PACKAGES="${PACKAGES}" \
 		FILES=${FILES} \
 		CONFIG_DOWNLOAD_FOLDER=$(realpath ${CACHE})/${INSTRUCTION_SET}

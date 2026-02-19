@@ -1,25 +1,38 @@
 """Executor that runs OpenWrt ImageBuilder commands."""
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Any
 
 
 _SAFE_VALUE_RE = re.compile(r"^[A-Za-z0-9_.@:+\-/]+$")
 _SAFE_PART_RE = re.compile(r"^[A-Za-z0-9_.+-]+$")
+_SAFE_PKG_RE = re.compile(r"^[A-Za-z0-9_.+-]+$")
 
 
 class ImageBuilderExecutor:
     """Thin wrapper over external imagebuilder Makefile-based frontend."""
 
-    def __init__(self, builds_dir: Path, files_dir: Path, cache_dir: Path, wrapper_dir: Path) -> None:
+    def __init__(
+        self,
+        builds_dir: Path,
+        files_dir: Path,
+        cache_dir: Path,
+        wrapper_dir: Path,
+        profiles_dir: Path,
+        lists_dir: Path,
+    ) -> None:
         self._builds_dir = builds_dir
         self._files_dir = files_dir
         self._cache_dir = cache_dir
         self._wrapper_dir = wrapper_dir
+        self._profiles_dir = profiles_dir
+        self._lists_dir = lists_dir
         self._builds_dir.mkdir(parents=True, exist_ok=True)
         self._cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -53,12 +66,72 @@ class ImageBuilderExecutor:
             raise ValueError(f"invalid_{name}")
         return value
 
-    @classmethod
-    def _parse_target(cls, target_raw: str) -> tuple[str, str]:
-        parts = [p for p in str(target_raw).strip().split("/") if p]
-        if len(parts) != 2:
-            raise ValueError("invalid_target_format_expected_target_subtarget")
-        return cls._safe_part("target", parts[0]), cls._safe_part("subtarget", parts[1])
+    @staticmethod
+    def _safe_pkg(name: str) -> str:
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("invalid_package_name")
+        name = name.strip()
+        if not _SAFE_PKG_RE.match(name):
+            raise ValueError("invalid_package_name")
+        return name
+
+    @staticmethod
+    def _uniq(values: list[str]) -> list[str]:
+        seen: set[str] = set()
+        out: list[str] = []
+        for value in values:
+            if value in seen:
+                continue
+            seen.add(value)
+            out.append(value)
+        return out
+
+    @staticmethod
+    def _json_load(path: Path) -> dict[str, Any]:
+        if not path.exists():
+            raise FileNotFoundError(path)
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            raise ValueError("invalid_json_payload")
+        return data
+
+    def _resolve_profile(self, profile_id: str) -> tuple[str, list[str], list[str]]:
+        profile_payload = self._json_load(self._profiles_dir / f"{profile_id}.json")
+        profile = profile_payload.get("profile")
+        if not isinstance(profile, dict):
+            raise ValueError("invalid_profile_payload")
+
+        raw_lists = profile.get("lists") or []
+        if not isinstance(raw_lists, list):
+            raise ValueError("invalid_profile_lists")
+        list_ids = [self._safe_part("list_id", str(item)) for item in raw_lists]
+
+        include: list[str] = []
+        exclude: list[str] = []
+        for list_id in list_ids:
+            list_payload = self._json_load(self._lists_dir / f"{list_id}.json")
+            list_data = list_payload.get("list")
+            if not isinstance(list_data, dict):
+                raise ValueError("invalid_list_payload")
+            list_include = list_data.get("include") or []
+            list_exclude = list_data.get("exclude") or []
+            if not isinstance(list_include, list) or not isinstance(list_exclude, list):
+                raise ValueError("invalid_list_include_exclude")
+            include.extend(self._safe_pkg(str(pkg)) for pkg in list_include)
+            exclude.extend(self._safe_pkg(str(pkg)) for pkg in list_exclude)
+
+        extra_include = profile.get("extra_include") or []
+        extra_exclude = profile.get("extra_exclude") or []
+        if not isinstance(extra_include, list) or not isinstance(extra_exclude, list):
+            raise ValueError("invalid_profile_extra_include_exclude")
+        include.extend(self._safe_pkg(str(pkg)) for pkg in extra_include)
+        exclude.extend(self._safe_pkg(str(pkg)) for pkg in extra_exclude)
+
+        # API has no dedicated field yet; allow explicit key in profile payload.
+        requested = profile.get("device_profile") or profile.get("platform")
+        device_profile = self._safe_make_arg("profile", str(requested or profile_id))
+        return device_profile, self._uniq(include), self._uniq(exclude)
 
     @staticmethod
     def _write_build_config(
@@ -67,7 +140,7 @@ class ImageBuilderExecutor:
         version: str,
         target: str,
         subtarget: str,
-        platform: str,
+        profile: str,
     ) -> Path:
         cfg_dir.mkdir(parents=True, exist_ok=True)
         cfg_path = cfg_dir / "config.mk"
@@ -77,7 +150,7 @@ class ImageBuilderExecutor:
                     f"RELEASE = {version}",
                     f"TARGET = {target}",
                     f"SUBTARGET = {subtarget}",
-                    f"PLATFORM = {platform}",
+                    f"PROFILE = {profile}",
                     "",
                 ]
             ),
@@ -98,9 +171,10 @@ class ImageBuilderExecutor:
         options = dict(request.get("options") or {})
 
         version = self._safe_part("version", str(request.get("version") or ""))
-        target, subtarget = self._parse_target(str(request.get("target") or ""))
-        # NOTE: until API gets a dedicated device profile field.
-        profile = self._safe_make_arg("profile", str(request.get("profile_id") or ""))
+        target = self._safe_part("target", str(request.get("target") or ""))
+        subtarget = self._safe_part("subtarget", str(request.get("subtarget") or ""))
+        profile_id = self._safe_part("profile_id", str(request.get("profile_id") or ""))
+        profile, include_pkgs, exclude_pkgs = self._resolve_profile(profile_id)
         jobs = str(max(1, (os.cpu_count() or 1)))
         debug = bool(options.get("debug"))
         if not (self._wrapper_dir / "Makefile").exists():
@@ -113,7 +187,7 @@ class ImageBuilderExecutor:
             version=version,
             target=target,
             subtarget=subtarget,
-            platform=profile,
+            profile=profile,
         )
         self._sync_files(self._files_dir, out_dir / "files")
 
@@ -123,6 +197,8 @@ class ImageBuilderExecutor:
             f"-j{jobs}",
             f"C={out_dir}",
             f"CACHE={cache_override}",
+            f"PACKAGES_INCLUDE={' '.join(include_pkgs)}",
+            f"PACKAGES_EXCLUDE={' '.join(exclude_pkgs)}",
             "image",
         ]
         if debug:

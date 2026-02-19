@@ -21,6 +21,7 @@ class BuildRequest(BaseModel):
 
     profile_id: str
     target: str
+    subtarget: str
     version: str
     options: BuildOptions = Field(default_factory=BuildOptions)
 

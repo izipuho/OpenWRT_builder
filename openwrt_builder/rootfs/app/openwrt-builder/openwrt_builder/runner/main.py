@@ -11,12 +11,21 @@ def main() -> None:
     """Start the build runner with environment-based configuration."""
     builds_dir = env_path("OPENWRT_BUILDER_BUILDS_DIR")
     files_dir = env_path("OPENWRT_BUILDER_FILES_DIR")
+    lists_dir = env_path("OPENWRT_BUILDER_LISTS_DIR")
+    profiles_dir = env_path("OPENWRT_BUILDER_PROFILES_DIR")
     cache_dir = env_path("OPENWRT_BUILDER_CACHE_DIR")
     wrapper_dir = env_path("OPENWRT_BUILDER_WRAPPER_DIR")
     runtime_dir = env_path("OPENWRT_BUILDER_RUNTIME_DIR")
 
     queue = BuildQueue(builds_dir / "queue.json")
-    executor = ImageBuilderExecutor(builds_dir, files_dir, cache_dir, wrapper_dir)
+    executor = ImageBuilderExecutor(
+        builds_dir=builds_dir,
+        files_dir=files_dir,
+        cache_dir=cache_dir,
+        wrapper_dir=wrapper_dir,
+        profiles_dir=profiles_dir,
+        lists_dir=lists_dir,
+    )
 
     runner = BuildRunner(
         cfg=RunnerConfig(builds_dir=builds_dir, runtime_dir=runtime_dir),

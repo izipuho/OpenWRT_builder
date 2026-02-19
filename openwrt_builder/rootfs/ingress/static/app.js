@@ -669,6 +669,7 @@ async function createBuild() {
     showBuildsError("");
     const profileId = el("builds-profile").value.trim();
     const target = el("builds-target").value.trim();
+    const subtarget = el("builds-subtarget").value.trim();
     const version = el("builds-version").value.trim();
     const forceRebuild = el("builds-force").checked;
     const debug = el("builds-debug").checked;
@@ -679,6 +680,10 @@ async function createBuild() {
     }
     if (!target) {
         showBuildsError("Target is required");
+        return;
+    }
+    if (!subtarget) {
+        showBuildsError("Subtarget is required");
         return;
     }
     if (!version) {
@@ -692,6 +697,7 @@ async function createBuild() {
             request: {
                 profile_id: profileId,
                 target,
+                subtarget,
                 version,
                 options: {
                     force_rebuild: forceRebuild,
