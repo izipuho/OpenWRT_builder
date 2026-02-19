@@ -101,6 +101,18 @@ class ImageBuilderExecutor:
             raise ValueError("invalid_profile_file_path")
         return "/".join(parts)
 
+    @staticmethod
+    def _normalize_file_not_found(exc: FileNotFoundError) -> RuntimeError:
+        raw = str(exc or "").strip()
+        if raw.startswith("selected_file_not_found:"):
+            return RuntimeError(raw)
+        if raw.startswith("profile_not_found:") or raw.startswith("list_not_found:"):
+            return RuntimeError(raw)
+        missing = Path(raw).name if raw else ""
+        if not missing:
+            missing = "unknown"
+        return RuntimeError(f"file_not_found:{missing}")
+
     def _resolve_output_images(self, options: dict[str, Any]) -> list[str]:
         raw = options.get("output_images")
         if raw is None:
@@ -195,7 +207,10 @@ class ImageBuilderExecutor:
             shutil.rmtree(path, ignore_errors=True)
 
     def _resolve_profile(self, profile_id: str) -> tuple[str, list[str], list[str], list[str]]:
-        profile_payload = self._json_load(self._profiles_dir / f"{profile_id}.json")
+        try:
+            profile_payload = self._json_load(self._profiles_dir / f"{profile_id}.json")
+        except FileNotFoundError as exc:
+            raise RuntimeError(f"profile_not_found:{profile_id}") from exc
         profile = profile_payload.get("profile")
         if not isinstance(profile, dict):
             raise ValueError("invalid_profile_payload")
@@ -208,7 +223,10 @@ class ImageBuilderExecutor:
         include: list[str] = []
         exclude: list[str] = []
         for list_id in list_ids:
-            list_payload = self._json_load(self._lists_dir / f"{list_id}.json")
+            try:
+                list_payload = self._json_load(self._lists_dir / f"{list_id}.json")
+            except FileNotFoundError as exc:
+                raise RuntimeError(f"list_not_found:{list_id}") from exc
             list_data = list_payload.get("list")
             if not isinstance(list_data, dict):
                 raise ValueError("invalid_list_payload")
@@ -276,7 +294,7 @@ class ImageBuilderExecutor:
         for rel in selected_files:
             src_path = src / rel
             if not src_path.is_file():
-                raise FileNotFoundError(f"profile_file_not_found:{rel}")
+                raise FileNotFoundError(f"selected_file_not_found:{rel}")
             dst_path = dst / rel
             dst_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src_path, dst_path)
@@ -370,6 +388,11 @@ class ImageBuilderExecutor:
             if artifacts and artifacts[0]["role"] != "primary":
                 artifacts[0]["role"] = "primary"
             return {"artifacts": artifacts}
+        except FileNotFoundError as exc:
+            raise self._normalize_file_not_found(exc) from exc
+        except OSError as exc:
+            detail = str(exc.strerror or "").strip() or exc.__class__.__name__
+            raise RuntimeError(f"io_error:{detail}") from exc
         finally:
             if proc is not None and proc.poll() is None:
                 self._terminate_process(proc)
