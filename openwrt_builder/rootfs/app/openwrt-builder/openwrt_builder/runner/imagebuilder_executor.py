@@ -87,6 +87,16 @@ class ImageBuilderExecutor:
         return out
 
     @staticmethod
+    def _safe_file_rel(path_raw: str) -> str:
+        value = str(path_raw or "").strip().replace("\\", "/")
+        if not value:
+            raise ValueError("invalid_profile_file_path")
+        parts = value.split("/")
+        if any(part in {"", ".", ".."} for part in parts):
+            raise ValueError("invalid_profile_file_path")
+        return "/".join(parts)
+
+    @staticmethod
     def _json_load(path: Path) -> dict[str, Any]:
         if not path.exists():
             raise FileNotFoundError(path)
@@ -96,7 +106,7 @@ class ImageBuilderExecutor:
             raise ValueError("invalid_json_payload")
         return data
 
-    def _resolve_profile(self, profile_id: str) -> tuple[str, list[str], list[str]]:
+    def _resolve_profile(self, profile_id: str) -> tuple[str, list[str], list[str], list[str]]:
         profile_payload = self._json_load(self._profiles_dir / f"{profile_id}.json")
         profile = profile_payload.get("profile")
         if not isinstance(profile, dict):
@@ -128,10 +138,15 @@ class ImageBuilderExecutor:
         include.extend(self._safe_pkg(str(pkg)) for pkg in extra_include)
         exclude.extend(self._safe_pkg(str(pkg)) for pkg in extra_exclude)
 
+        raw_files = profile.get("files") or []
+        if not isinstance(raw_files, list):
+            raise ValueError("invalid_profile_files")
+        selected_files = [self._safe_file_rel(str(path)) for path in raw_files]
+
         # API has no dedicated field yet; allow explicit key in profile payload.
         requested = profile.get("device_profile") or profile.get("platform")
         device_profile = self._safe_make_arg("profile", str(requested or profile_id))
-        return device_profile, self._uniq(include), self._uniq(exclude)
+        return device_profile, self._uniq(include), self._uniq(exclude), self._uniq(selected_files)
 
     @staticmethod
     def _write_build_config(
@@ -165,11 +180,18 @@ class ImageBuilderExecutor:
         return cfg_path
 
     @staticmethod
-    def _sync_files(src: Path, dst: Path) -> None:
+    def _sync_files(src: Path, dst: Path, selected_files: list[str]) -> None:
         if dst.exists():
             shutil.rmtree(dst)
-        if src.exists() and any(src.rglob("*")):
-            shutil.copytree(src, dst)
+        if not selected_files:
+            return
+        for rel in selected_files:
+            src_path = src / rel
+            if not src_path.is_file():
+                raise FileNotFoundError(f"profile_file_not_found:{rel}")
+            dst_path = dst / rel
+            dst_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src_path, dst_path)
 
     def __call__(self, build: dict) -> dict:
         build_id = str(build["build_id"])
@@ -180,7 +202,7 @@ class ImageBuilderExecutor:
         target = self._safe_part("target", str(request.get("target") or ""))
         subtarget = self._safe_part("subtarget", str(request.get("subtarget") or ""))
         profile_id = self._safe_part("profile_id", str(request.get("profile_id") or ""))
-        profile, include_pkgs, exclude_pkgs = self._resolve_profile(profile_id)
+        profile, include_pkgs, exclude_pkgs, selected_files = self._resolve_profile(profile_id)
         jobs = str(max(1, (os.cpu_count() or 1)))
         debug = bool(options.get("debug"))
         if not (self._wrapper_dir / "Makefile").exists():
@@ -197,7 +219,7 @@ class ImageBuilderExecutor:
             include_pkgs=include_pkgs,
             exclude_pkgs=exclude_pkgs,
         )
-        self._sync_files(self._files_dir, out_dir / "files")
+        self._sync_files(self._files_dir, out_dir / "files", selected_files)
 
         cache_override = self._cache_dir / "imagebuilder" / version
         cmd = [
