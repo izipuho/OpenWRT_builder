@@ -22,6 +22,7 @@ DEPS += $(shell [ -d $C/files ] && find $C/files -type f,l)
 DEPS += ${CONFIGS}
 
 imagebuilder ?= openwrt-imagebuilder-${RELEASE}-${TARGET}-${SUBTARGET}.Linux-x86_64
+imagebuilder_archive ?= ${imagebuilder}.tar.zst
 
 ifndef PROFILE
 $(error PROFILE must be defined)
@@ -54,10 +55,10 @@ ${BUILDDIR}:
 
 imagebuilder: ${BUILDDIR}/${imagebuilder}
 
-${BUILDDIR}/${imagebuilder}: ${CACHE}/${imagebuilder}.tar.xz ${BUILDDIR}
-	tar -C ${BUILDDIR} -xf $<
+${BUILDDIR}/${imagebuilder}: ${CACHE}/${imagebuilder_archive} ${BUILDDIR}
+	tar --zstd -C ${BUILDDIR} -xf "$<"
 
-${CACHE}/${imagebuilder}.tar.xz: | ${CACHE}
+${CACHE}/${imagebuilder_archive}: | ${CACHE}
 	curl --fail --location --remote-name --continue-at - --output-dir $| ${DOWNLOADS_BASE}/${@F}
 
 image: ${OUT_IMAGES:%=$C/%}
