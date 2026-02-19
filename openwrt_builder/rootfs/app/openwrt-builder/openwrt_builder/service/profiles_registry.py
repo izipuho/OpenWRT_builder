@@ -81,9 +81,12 @@ class BaseRegistry:
                             f"{self._config_type}_id": path.stem,
                         }
                     )
-                except (OSError, json.JSONDecodeError, ValueError):
+                except Exception:
+                    # A single broken config file must not break list endpoints.
                     continue
-        configs.sort(key=lambda x: x["updated_at"])
+        # Legacy or partially-migrated records may miss updated_at.
+        # Keep listing resilient instead of failing the entire endpoint.
+        configs.sort(key=lambda x: str(x.get("updated_at") or ""))
         return configs
 
     def list_summary(self) -> list[dict[str, Any]]:
