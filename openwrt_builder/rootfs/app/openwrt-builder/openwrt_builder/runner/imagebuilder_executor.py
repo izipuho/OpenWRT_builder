@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import platform
 import re
 import signal
 import shutil
@@ -192,6 +193,13 @@ class ImageBuilderExecutor:
             shutil.rmtree(path, ignore_errors=True)
 
     @staticmethod
+    def _assert_supported_host_arch() -> None:
+        """OpenWrt ImageBuilder artifacts we use are Linux-x86_64 only."""
+        machine = platform.machine().strip().lower()
+        if machine not in {"x86_64", "amd64"}:
+            raise RuntimeError(f"unsupported_host_arch:{machine}:requires_x86_64")
+
+    @staticmethod
     def _cleanup_temp_builddir_from_hint(hint_path: Path) -> None:
         try:
             raw = hint_path.read_text(encoding="utf-8", errors="replace").strip()
@@ -297,6 +305,7 @@ class ImageBuilderExecutor:
             shutil.copy2(src_path, dst_path)
 
     def __call__(self, build: dict) -> dict:
+        self._assert_supported_host_arch()
         build_id = str(build["build_id"])
         request = dict(build.get("request") or {})
         options = dict(request.get("options") or {})
