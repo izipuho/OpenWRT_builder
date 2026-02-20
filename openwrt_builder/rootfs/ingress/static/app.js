@@ -1,6 +1,6 @@
-// const API = "http://10.8.25.110:8080/api/v1";
+const API = "http://10.8.25.110:8080/api/v1";
 // Keep paths ingress-relative (no leading slash), so requests stay under HA ingress prefix.
-const API = "api/v1";
+// const API = "api/v1";
 const EXAMPLES_BASE = "examples";
 
 const templateCache = {
@@ -562,6 +562,21 @@ function showBuildsError(err = "") {
     el("builds-error").classList.toggle("hidden", !msg);
 }
 
+function hideBuildRequestDetails() {
+    el("builds-request").classList.add("hidden");
+    el("builds-request-body").textContent = "";
+}
+
+function showBuildRequestDetails(build) {
+    const buildId = String(build?.build_id || "").trim();
+    const request = build?.request ?? {};
+    el("builds-request-title").textContent = buildId
+        ? `Build request: ${buildId}`
+        : "Build request";
+    el("builds-request-body").textContent = JSON.stringify(request, null, 2);
+    el("builds-request").classList.remove("hidden");
+}
+
 function renderBuildProfileOptions(rows) {
     const select = el("builds-profile");
     const options = (rows || [])
@@ -620,6 +635,7 @@ function renderBuildsTable(rows) {
         const canStop = state === "running" && !r.cancel_requested;
         const canDelete = state !== "running";
         const canDownload = state === "done";
+        const canRebuild = state !== "running";
         return `
           <tr>
             <td>${escapeHtml(buildId)}</td>
@@ -628,7 +644,9 @@ function renderBuildsTable(rows) {
             <td>${renderUpdatedAtCell(r.updated_at)}</td>
             <td>${escapeHtml(r.message ?? "")}</td>
             <td class="actions">
+              <button type="button" data-act="params" data-id="${escapeAttr(buildId)}">Params</button>
               ${canStop ? `<button type="button" data-act="stop" data-id="${escapeAttr(buildId)}">Stop</button>` : ""}
+              ${canRebuild ? `<button type="button" data-act="rebuild" data-id="${escapeAttr(buildId)}">Rebuild</button>` : ""}
               ${canDelete ? `<button type="button" data-act="delete" data-id="${escapeAttr(buildId)}">Delete</button>` : ""}
               ${canDownload ? `<button type="button" data-act="download" data-id="${escapeAttr(buildId)}">Download</button>` : ""}
             </td>
@@ -644,8 +662,12 @@ function renderBuildsTable(rows) {
         b.addEventListener("click", async () => {
             const buildId = b.getAttribute("data-id");
             const act = b.getAttribute("data-act");
-            if (act === "stop") {
+            if (act === "params") {
+                await viewBuildRequest(buildId);
+            } else if (act === "stop") {
                 await cancelBuild(buildId);
+            } else if (act === "rebuild") {
+                await rebuildBuild(buildId);
             } else if (act === "delete") {
                 await deleteBuild(buildId);
             } else if (act === "download") {
@@ -710,6 +732,35 @@ async function refreshBuilds() {
     renderBuildsTable(builds);
 }
 
+function normalizeBuildRequest(request = {}) {
+    const options = request?.options || {};
+    const outputImages = Array.isArray(options.output_images)
+        ? options.output_images.filter((v) => typeof v === "string" && v.trim())
+        : ["sysupgrade"];
+    return {
+        profile_id: String(request?.profile_id || "").trim(),
+        platform: String(request?.platform || "").trim(),
+        target: String(request?.target || "").trim(),
+        subtarget: String(request?.subtarget || "").trim(),
+        version: String(request?.version || "").trim(),
+        options: {
+            force_rebuild: Boolean(options.force_rebuild),
+            debug: Boolean(options.debug),
+            output_images: outputImages.length ? outputImages : ["sysupgrade"],
+        },
+    };
+}
+
+async function fetchBuild(buildId) {
+    return apiJson(`${API}/build/${encodeURIComponent(buildId)}`);
+}
+
+async function viewBuildRequest(buildId) {
+    showBuildsError("");
+    const build = await fetchBuild(buildId);
+    showBuildRequestDetails(build);
+}
+
 async function createBuild() {
     showBuildsError("");
     const profileId = el("builds-profile").value.trim();
@@ -756,6 +807,30 @@ async function createBuild() {
                     force_rebuild: forceRebuild,
                     debug,
                     output_images: outputImages,
+                },
+            },
+        }),
+    });
+    await refreshBuilds();
+}
+
+async function rebuildBuild(buildId) {
+    showBuildsError("");
+    const sourceBuild = await fetchBuild(buildId);
+    const request = normalizeBuildRequest(sourceBuild?.request || {});
+
+    if (!request.profile_id || !request.platform || !request.target || !request.subtarget || !request.version) {
+        throw new Error(`Build ${buildId} has invalid request payload`);
+    }
+
+    await apiJson(`${API}/build`, {
+        method: "POST",
+        body: JSON.stringify({
+            request: {
+                ...request,
+                options: {
+                    ...request.options,
+                    force_rebuild: true,
                 },
             },
         }),
@@ -868,6 +943,7 @@ function boot() {
 
     el("builds-refresh").addEventListener("click", () => refreshBuilds().catch((e) => showBuildsError(e.message || e)));
     el("builds-create").addEventListener("click", () => createBuild().catch((e) => showBuildsError(e.message || e)));
+    el("builds-request-close").addEventListener("click", hideBuildRequestDetails);
 
     el("lists-refresh").addEventListener("click", () => refreshLists().catch(() => { }));
     el("lists-create").addEventListener("click", () => openListEditor(null).catch(() => { }));
@@ -878,6 +954,7 @@ function boot() {
     el("files-upload").addEventListener("click", () => uploadFiles().catch((e) => showFilesError(e.message || e)));
 
     setTab("builds");
+    hideBuildRequestDetails();
     refreshBuilds().catch((e) => showBuildsError(e.message || e));
     refreshLists().catch(() => { });
     refreshProfiles().catch(() => { });

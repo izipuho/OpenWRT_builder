@@ -65,6 +65,14 @@ body {
     margin: 0;
 }
 
+#builds-request .toolbar {
+    justify-content: space-between;
+}
+
+#builds-request h2 {
+    margin: 0;
+}
+
 .checklist.build-options {
     margin-top: 12px;
     max-height: none;
@@ -233,6 +241,16 @@ textarea {
     border-radius: 8px;
     background: #fff3f3;
     white-space: pre-wrap;
+}
+
+.json-view {
+    margin: 0;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fafafa;
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
 .hidden {
