@@ -2,6 +2,8 @@ const API = "http://10.8.25.110:8080/api/v1";
 // Keep paths ingress-relative (no leading slash), so requests stay under HA ingress prefix.
 // const API = "api/v1";
 const EXAMPLES_BASE = "examples";
+const BUILDS_AUTO_REFRESH_MS = 2000;
+let buildsAutoRefreshHandle = null;
 
 const templateCache = {
     list: null,
@@ -652,17 +654,23 @@ function showBuildRequestDetails(build, anchorEl) {
     positionTooltip(tooltip, anchorEl);
 }
 
-function showBuildMessageDetails(buildId, messageText, anchorEl) {
+function showBuildMessageDetails(buildId, messageText, anchorEl, titlePrefix = "Build message") {
     const tooltip = el("builds-message-tooltip");
     const fullText = String(messageText ?? "");
     el("builds-message-tooltip-title").textContent = buildId
-        ? `Build message: ${buildId}`
-        : "Build message";
+        ? `${titlePrefix}: ${buildId}`
+        : titlePrefix;
     el("builds-message-tooltip-body").textContent = fullText;
     tooltip.dataset.buildId = String(buildId || "");
     tooltip.dataset.messageText = fullText;
     tooltip.classList.remove("hidden");
     positionTooltip(tooltip, anchorEl);
+}
+
+function formatPhase(rawPhase) {
+    const phase = String(rawPhase || "").trim();
+    if (!phase) return "-";
+    return phase.replaceAll("_", " ");
 }
 
 function renderBuildProfileOptions(rows) {
@@ -715,7 +723,7 @@ function renderBuildsTable(rows) {
     const html = `
     <table>
       <thead>
-        <tr><th>build_id</th><th>state</th><th>progress</th><th>updated_at</th><th>message</th><th></th></tr>
+        <tr><th>build_id</th><th>state</th><th>phase</th><th>progress</th><th>updated_at</th><th>message</th><th></th></tr>
       </thead>
       <tbody>
         ${sortedRows.map((r) => {
@@ -730,6 +738,7 @@ function renderBuildsTable(rows) {
           <tr>
             <td>${escapeHtml(buildId)}</td>
             <td>${renderBuildStateBadge(state)}</td>
+            <td>${escapeHtml(formatPhase(r.phase))}</td>
             <td>${escapeHtml(String(r.progress ?? ""))}%</td>
             <td>${renderUpdatedAtCell(r.updated_at)}</td>
             <td>
@@ -761,6 +770,7 @@ function renderBuildsTable(rows) {
                   aria-label="Show build params"
                 ></button>
                 <div class="actions-buttons">
+                  <button type="button" data-act="logs" data-id="${escapeAttr(buildId)}">Logs</button>
                   ${canStop ? `<button type="button" data-act="stop" data-id="${escapeAttr(buildId)}">Stop</button>` : ""}
                   ${canRebuild ? `<button type="button" data-act="rebuild" data-id="${escapeAttr(buildId)}">Rebuild</button>` : ""}
                   ${canDelete ? `<button type="button" data-act="delete" data-id="${escapeAttr(buildId)}">Delete</button>` : ""}
@@ -786,6 +796,8 @@ function renderBuildsTable(rows) {
                 const fullMessage = String(byId.get(String(buildId || ""))?.message ?? "");
                 if (!fullMessage) return;
                 await viewBuildMessage(buildId, fullMessage, b);
+            } else if (act === "logs") {
+                await viewBuildLogs(buildId, b);
             } else if (act === "stop") {
                 await cancelBuild(buildId);
             } else if (act === "rebuild") {
@@ -897,7 +909,47 @@ async function viewBuildMessage(buildId, fullMessage, anchorEl) {
         hideBuildMessageDetails();
         return;
     }
-    showBuildMessageDetails(buildId, fullMessage, anchorEl);
+    showBuildMessageDetails(buildId, fullMessage, anchorEl, "Build message");
+}
+
+function formatBuildLogs(payload = {}) {
+    const state = String(payload?.state || "").trim() || "unknown";
+    const phase = String(payload?.phase || "").trim() || "n/a";
+    const stdout = String(payload?.stdout || "");
+    const stderr = String(payload?.stderr || "");
+    const stdoutTruncated = Boolean(payload?.stdout_truncated);
+    const stderrTruncated = Boolean(payload?.stderr_truncated);
+    const updatedAt = String(payload?.updated_at || "");
+    const chunks = [
+        `state: ${state}`,
+        `phase: ${phase}`,
+        `updated_at: ${updatedAt || "-"}`,
+        "",
+        "[STDOUT]",
+        stdout || "<empty>",
+        stdoutTruncated ? "\n...stdout truncated..." : "",
+        "",
+        "[STDERR]",
+        stderr || "<empty>",
+        stderrTruncated ? "\n...stderr truncated..." : "",
+    ];
+    return chunks.join("\n");
+}
+
+async function fetchBuildLogs(buildId, limit = 24000) {
+    return apiJson(`${API}/build/${encodeURIComponent(buildId)}/logs?limit=${encodeURIComponent(String(limit))}`);
+}
+
+async function viewBuildLogs(buildId, anchorEl) {
+    showBuildsError("");
+    hideBuildRequestDetails();
+    const tooltip = el("builds-message-tooltip");
+    if (!tooltip.classList.contains("hidden") && tooltip.dataset.buildId === String(buildId || "")) {
+        hideBuildMessageDetails();
+        return;
+    }
+    const payload = await fetchBuildLogs(buildId);
+    showBuildMessageDetails(buildId, formatBuildLogs(payload), anchorEl, "Build logs");
 }
 
 async function createBuild() {
@@ -1121,7 +1173,7 @@ function boot() {
         const target = event.target;
         if (!(target instanceof Node)) return;
         if (requestTooltip.contains(target) || messageTooltip.contains(target)) return;
-        if (target instanceof Element && target.closest('button[data-act="params"], button[data-act="show-message"]')) return;
+        if (target instanceof Element && target.closest('button[data-act="params"], button[data-act="show-message"], button[data-act="logs"]')) return;
         hideBuildTooltips();
     });
     document.addEventListener("keydown", (event) => {
@@ -1141,6 +1193,12 @@ function boot() {
     setTab("builds");
     hideBuildTooltips();
     refreshBuilds().catch((e) => showBuildsError(e.message || e));
+    if (buildsAutoRefreshHandle === null) {
+        buildsAutoRefreshHandle = window.setInterval(() => {
+            if (el("view-builds").classList.contains("hidden")) return;
+            refreshBuilds().catch(() => { });
+        }, BUILDS_AUTO_REFRESH_MS);
+    }
     refreshLists().catch(() => { });
     refreshProfiles().catch(() => { });
     refreshFiles().catch((e) => showFilesError(e.message || e));

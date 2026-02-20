@@ -67,6 +67,25 @@ class BuildResultModel(StrictModel):
     artifacts: list[BuildArtifactModel] = Field(min_length=1)
 
 
+class BuildPhaseEventModel(StrictModel):
+    """Single phase/progress event emitted by the runner/executor."""
+
+    at: str
+    phase: str
+    progress: int = Field(ge=0, le=100)
+    message: str | None = None
+
+
+class BuildLogsModel(StrictModel):
+    """Persisted log references and tails for a build."""
+
+    stdout_path: str | None = None
+    stderr_path: str | None = None
+    stdout_tail: str = ""
+    stderr_tail: str = ""
+    updated_at: str | None = None
+
+
 class BuildModel(StrictModel):
     """Build payload persisted to builds registry."""
 
@@ -76,6 +95,9 @@ class BuildModel(StrictModel):
     updated_at: str
     progress: int
     message: str | None = None
+    phase: str | None = None
+    phase_events: list[BuildPhaseEventModel] = Field(default_factory=list)
+    logs: BuildLogsModel | None = None
     request: BuildRequestModel
     result: BuildResultModel | None = None
     cancel_requested: bool = False

@@ -159,6 +159,9 @@ class BuildsRegistry:
             "updated_at": created_at,
             "progress": 0,
             "message": None,
+            "phase": "queued",
+            "phase_events": [],
+            "logs": None,
             "request": request,
             "result": None,
             "cancel_requested": False,
@@ -282,5 +285,66 @@ class BuildsRegistry:
         if artifact_dir is not None and artifact_dir.exists():
             shutil.rmtree(artifact_dir, ignore_errors=True)
 
+        logs = build.get("logs") or {}
+        for key in ("stdout_path", "stderr_path"):
+            path_raw = logs.get(key)
+            if not isinstance(path_raw, str) or not path_raw:
+                continue
+            path = Path(path_raw)
+            if path.exists():
+                try:
+                    path.unlink()
+                except OSError:
+                    pass
+        logs_dir = self._builds_path / build_id / "logs"
+        if logs_dir.exists():
+            shutil.rmtree(logs_dir, ignore_errors=True)
+        build_dir = self._builds_path / build_id
+        if build_dir.exists():
+            shutil.rmtree(build_dir, ignore_errors=True)
+
         self._build_path(build_id).unlink()
         return True
+
+    @staticmethod
+    def _read_tail(path: Path, limit: int) -> tuple[str, bool]:
+        if not path.exists() or limit <= 0:
+            return "", False
+        try:
+            raw = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return "", False
+        if len(raw) <= limit:
+            return raw, False
+        return raw[-limit:], True
+
+    def get_build_logs(self, build_id: str, *, limit: int = 20000) -> dict[str, Any]:
+        """Return persisted stdout/stderr tails for a build."""
+        build = self._read_build(build_id)
+        safe_limit = max(1024, min(int(limit), 1_000_000))
+
+        logs = build.get("logs") or {}
+        stdout_path_raw = logs.get("stdout_path")
+        stderr_path_raw = logs.get("stderr_path")
+        stdout_path = Path(stdout_path_raw) if isinstance(stdout_path_raw, str) and stdout_path_raw else None
+        stderr_path = Path(stderr_path_raw) if isinstance(stderr_path_raw, str) and stderr_path_raw else None
+
+        stdout, stdout_truncated = ("", False)
+        stderr, stderr_truncated = ("", False)
+        if stdout_path is not None:
+            stdout, stdout_truncated = self._read_tail(stdout_path, safe_limit)
+        if stderr_path is not None:
+            stderr, stderr_truncated = self._read_tail(stderr_path, safe_limit)
+
+        return {
+            "build_id": build_id,
+            "phase": build.get("phase"),
+            "state": build.get("state"),
+            "updated_at": build.get("updated_at"),
+            "stdout_path": str(stdout_path) if stdout_path is not None else None,
+            "stderr_path": str(stderr_path) if stderr_path is not None else None,
+            "stdout": stdout,
+            "stderr": stderr,
+            "stdout_truncated": stdout_truncated,
+            "stderr_truncated": stderr_truncated,
+        }

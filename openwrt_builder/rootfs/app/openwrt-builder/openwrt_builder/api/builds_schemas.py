@@ -53,6 +53,7 @@ class BuildSummaryOut(BaseModel):
     updated_at: datetime
     progress: int = Field(ge=0, le=100)
     message: str | None = None
+    phase: str | None = None
     cancel_requested: bool = False
     runner_pid: int | None = None
 
@@ -74,11 +75,47 @@ class BuildResultOut(BaseModel):
     artifacts: list[BuildArtifactOut] = Field(min_length=1)
 
 
+class BuildPhaseEventOut(BaseModel):
+    """Single timestamped phase/progress point."""
+
+    at: datetime
+    phase: str
+    progress: int = Field(ge=0, le=100)
+    message: str | None = None
+
+
+class BuildLogsOut(BaseModel):
+    """Log pointers and persisted tails."""
+
+    stdout_path: str | None = None
+    stderr_path: str | None = None
+    stdout_tail: str = ""
+    stderr_tail: str = ""
+    updated_at: datetime | None = None
+
+
 class BuildOut(BuildSummaryOut):
     """Full build representation used in single-build endpoints."""
 
     request: BuildRequest
     result: BuildResultOut | None = None
+    phase_events: list[BuildPhaseEventOut] = Field(default_factory=list)
+    logs: BuildLogsOut | None = None
+
+
+class BuildLogsResponseOut(BaseModel):
+    """Tail content of persisted build logs."""
+
+    build_id: str
+    state: BuildState
+    phase: str | None = None
+    updated_at: datetime
+    stdout_path: str | None = None
+    stderr_path: str | None = None
+    stdout: str = ""
+    stderr: str = ""
+    stdout_truncated: bool = False
+    stderr_truncated: bool = False
 
 
 class CancelOut(BaseModel):

@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 _SAFE_VALUE_RE = re.compile(r"^[A-Za-z0-9_.@:+\-/]+$")
@@ -20,6 +20,7 @@ _IMAGE_SUFFIX = {
     "sysupgrade": "squashfs-sysupgrade.bin",
     "factory": "squashfs-factory.bin",
 }
+_LOG_CHUNK_MAX = 8192
 
 
 class BuildCanceled(RuntimeError):
@@ -147,6 +148,62 @@ class ImageBuilderExecutor:
         except OSError:
             return ""
         return text[-limit:]
+
+    @staticmethod
+    def _read_new_chunk(path: Path, offset: int, *, max_bytes: int = _LOG_CHUNK_MAX) -> tuple[str, int]:
+        if not path.exists():
+            return "", offset
+        try:
+            size = path.stat().st_size
+        except OSError:
+            return "", offset
+        safe_offset = max(0, min(offset, size))
+        try:
+            with path.open("rb") as f:
+                f.seek(safe_offset)
+                raw = f.read(max_bytes)
+                new_offset = f.tell()
+        except OSError:
+            return "", offset
+        if not raw:
+            return "", new_offset
+        return raw.decode("utf-8", errors="replace"), new_offset
+
+    @staticmethod
+    def _emit_update(
+        on_update: Callable[[dict[str, Any]], None] | None,
+        *,
+        progress: int,
+        phase: str,
+        message: str | None = None,
+        stdout_path: Path | None = None,
+        stderr_path: Path | None = None,
+        stdout_chunk: str | None = None,
+        stderr_chunk: str | None = None,
+        phase_event: bool = False,
+    ) -> None:
+        if on_update is None:
+            return
+        payload: dict[str, Any] = {
+            "progress": max(0, min(100, int(progress))),
+            "phase": phase,
+            "message": message,
+        }
+        if stdout_path is not None:
+            payload["stdout_path"] = str(stdout_path)
+        if stderr_path is not None:
+            payload["stderr_path"] = str(stderr_path)
+        if stdout_chunk:
+            payload["stdout_chunk"] = stdout_chunk
+        if stderr_chunk:
+            payload["stderr_chunk"] = stderr_chunk
+        if phase_event:
+            payload["phase_event"] = {
+                "phase": phase,
+                "progress": max(0, min(100, int(progress))),
+                "message": message,
+            }
+        on_update(payload)
 
     def _is_cancel_requested(self, build_id: str) -> bool:
         build_path = self._builds_dir / f"{build_id}.json"
@@ -304,17 +361,31 @@ class ImageBuilderExecutor:
             dst_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src_path, dst_path)
 
-    def __call__(self, build: dict) -> dict:
-        self._assert_supported_host_arch()
+    def __call__(
+        self,
+        build: dict,
+        *,
+        on_update: Callable[[dict[str, Any]], None] | None = None,
+    ) -> dict:
         build_id = str(build["build_id"])
         request = dict(build.get("request") or {})
         options = dict(request.get("options") or {})
+
+        self._emit_update(on_update, progress=6, phase="validating", message="validating", phase_event=True)
+        self._assert_supported_host_arch()
 
         version = self._safe_part("version", str(request.get("version") or ""))
         platform = self._safe_part("platform", str(request.get("platform") or ""))
         target = self._safe_part("target", str(request.get("target") or ""))
         subtarget = self._safe_part("subtarget", str(request.get("subtarget") or ""))
         profile_id = self._safe_part("profile_id", str(request.get("profile_id") or ""))
+        self._emit_update(
+            on_update,
+            progress=12,
+            phase="resolving_profile",
+            message=f"resolving_profile:{profile_id}",
+            phase_event=True,
+        )
         include_pkgs, exclude_pkgs, selected_files = self._resolve_profile(profile_id)
         output_images = self._resolve_output_images(options)
         jobs = str(max(1, (os.cpu_count() or 1)))
@@ -323,7 +394,10 @@ class ImageBuilderExecutor:
             raise RuntimeError("wrapper_makefile_missing")
 
         build_root = self._builds_dir / build_id
+        logs_dir = build_root / "logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
         out_dir = build_root / "wrapper-config"
+        self._emit_update(on_update, progress=16, phase="preparing", message="writing_config", phase_event=True)
         self._write_build_config(
             out_dir,
             version=version,
@@ -334,6 +408,13 @@ class ImageBuilderExecutor:
             exclude_pkgs=exclude_pkgs,
         )
         self._sync_files(self._files_dir, out_dir / "files", selected_files)
+        self._emit_update(
+            on_update,
+            progress=20,
+            phase="preparing",
+            message=f"files_selected:{len(selected_files)}",
+            phase_event=False,
+        )
 
         cache_override = self._cache_dir / "imagebuilder" / version
         builddir_hint = out_dir / ".imgbuilder_builddir"
@@ -349,9 +430,18 @@ class ImageBuilderExecutor:
         if debug:
             cmd.append("V=s")
 
-        stdout_log = out_dir / "stdout.log"
-        stderr_log = out_dir / "stderr.log"
+        stdout_log = logs_dir / "stdout.log"
+        stderr_log = logs_dir / "stderr.log"
         proc: subprocess.Popen[str] | None = None
+        self._emit_update(
+            on_update,
+            progress=24,
+            phase="building",
+            message="launching_make",
+            stdout_path=stdout_log,
+            stderr_path=stderr_log,
+            phase_event=True,
+        )
         try:
             with stdout_log.open("w", encoding="utf-8") as out_f, stderr_log.open("w", encoding="utf-8") as err_f:
                 proc = subprocess.Popen(
@@ -362,18 +452,66 @@ class ImageBuilderExecutor:
                     stderr=err_f,
                     preexec_fn=os.setsid,
                 )
+                stdout_pos = 0
+                stderr_pos = 0
+                progress = 24
+                last_progress_at = time.monotonic()
                 while proc.poll() is None:
                     if self._is_cancel_requested(build_id):
                         raise BuildCanceled("canceled")
+                    stdout_chunk, stdout_pos = self._read_new_chunk(stdout_log, stdout_pos)
+                    stderr_chunk, stderr_pos = self._read_new_chunk(stderr_log, stderr_pos)
+                    now = time.monotonic()
+                    progress_changed = False
+                    if now - last_progress_at >= 2.0 and progress < 92:
+                        progress += 1
+                        last_progress_at = now
+                        progress_changed = True
+                    if stdout_chunk or stderr_chunk or progress_changed:
+                        self._emit_update(
+                            on_update,
+                            progress=progress,
+                            phase="building",
+                            message="building",
+                            stdout_path=stdout_log,
+                            stderr_path=stderr_log,
+                            stdout_chunk=stdout_chunk,
+                            stderr_chunk=stderr_chunk,
+                            phase_event=False,
+                        )
                     time.sleep(0.2)
+                stdout_chunk, stdout_pos = self._read_new_chunk(stdout_log, stdout_pos)
+                stderr_chunk, stderr_pos = self._read_new_chunk(stderr_log, stderr_pos)
+                if stdout_chunk or stderr_chunk:
+                    self._emit_update(
+                        on_update,
+                        progress=93,
+                        phase="building",
+                        message="build_output_finalized",
+                        stdout_path=stdout_log,
+                        stderr_path=stderr_log,
+                        stdout_chunk=stdout_chunk,
+                        stderr_chunk=stderr_chunk,
+                        phase_event=False,
+                    )
 
             if proc.returncode != 0:
                 stderr_tail = self._tail_file(stderr_log)
                 stdout_tail = self._tail_file(stdout_log)
                 message = stderr_tail or stdout_tail or f"make_failed:{proc.returncode}"
+                self._emit_update(
+                    on_update,
+                    progress=94,
+                    phase="failed",
+                    message=f"make_failed:{proc.returncode}",
+                    stdout_path=stdout_log,
+                    stderr_path=stderr_log,
+                    phase_event=True,
+                )
                 raise RuntimeError(message.strip())
 
             artifacts: list[dict[str, Any]] = []
+            self._emit_update(on_update, progress=95, phase="collecting_artifacts", message="collecting_artifacts", phase_event=True)
             for image_kind in output_images:
                 image_name = f"openwrt-{version}-{target}-{subtarget}-{platform}-" f"{_IMAGE_SUFFIX[image_kind]}"
                 artifact_src = out_dir / image_name
@@ -392,8 +530,21 @@ class ImageBuilderExecutor:
                         "role": "primary" if image_kind == "sysupgrade" else "optional",
                     }
                 )
+                if len(output_images) > 0:
+                    collected = len(artifacts)
+                    step_progress = 95 + int((collected / len(output_images)) * 4)
+                else:
+                    step_progress = 98
+                self._emit_update(
+                    on_update,
+                    progress=min(99, step_progress),
+                    phase="collecting_artifacts",
+                    message=f"artifact_ready:{image_kind}",
+                    phase_event=False,
+                )
             if artifacts and artifacts[0]["role"] != "primary":
                 artifacts[0]["role"] = "primary"
+            self._emit_update(on_update, progress=99, phase="finalizing", message="finalizing", phase_event=True)
             return {"artifacts": artifacts}
         except FileNotFoundError as exc:
             raise self._normalize_file_not_found(exc) from exc

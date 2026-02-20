@@ -43,6 +43,7 @@ from openwrt_builder.api.builds_errors import (
 from openwrt_builder.api.builds_schemas import (
     BuildArtifactOut,
     BuildCreateIn,
+    BuildLogsResponseOut,
     BuildOut,
     BuildSummaryOut,
     CancelOut,
@@ -172,6 +173,22 @@ def get_build(req: Request, build_id: str):
 
     try:
         return BuildOut.model_validate(b)
+    except ValidationError as e:
+        raise invalid_build_payload_error(e)
+
+
+@router.get("/build/{build_id}/logs", response_model=BuildLogsResponseOut)
+def get_build_logs(req: Request, build_id: str, limit: int = 20000):
+    """Get persisted log tails for a build."""
+    reg = req.app.state.builds_registry
+
+    try:
+        payload = reg.get_build_logs(build_id, limit=limit)
+    except (ValueError, FileNotFoundError) as e:
+        raise map_get_build_error(e)
+
+    try:
+        return BuildLogsResponseOut.model_validate(payload)
     except ValidationError as e:
         raise invalid_build_payload_error(e)
 
