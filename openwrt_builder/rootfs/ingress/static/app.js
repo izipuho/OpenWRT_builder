@@ -588,18 +588,81 @@ async function copyText(text) {
 }
 
 function hideBuildRequestDetails() {
-    el("builds-request").classList.add("hidden");
-    el("builds-request-body").textContent = "";
+    const tooltip = el("builds-request-tooltip");
+    tooltip.classList.add("hidden");
+    tooltip.style.left = "";
+    tooltip.style.top = "";
+    tooltip.dataset.buildId = "";
+    tooltip.dataset.requestJson = "";
+    el("builds-request-tooltip-body").textContent = "";
 }
 
-function showBuildRequestDetails(build) {
+function hideBuildMessageDetails() {
+    const tooltip = el("builds-message-tooltip");
+    tooltip.classList.add("hidden");
+    tooltip.style.left = "";
+    tooltip.style.top = "";
+    tooltip.dataset.buildId = "";
+    tooltip.dataset.messageText = "";
+    el("builds-message-tooltip-body").textContent = "";
+}
+
+function hideBuildTooltips() {
+    hideBuildRequestDetails();
+    hideBuildMessageDetails();
+}
+
+function positionTooltip(tooltip, anchorEl) {
+    if (!anchorEl) return;
+    const rect = anchorEl.getBoundingClientRect();
+    const minGap = 8;
+    tooltip.style.left = `${window.scrollX + minGap}px`;
+    tooltip.style.top = `${window.scrollY + minGap}px`;
+
+    const tipRect = tooltip.getBoundingClientRect();
+    let left = window.scrollX + rect.left;
+    let top = window.scrollY + rect.bottom + minGap;
+
+    const maxLeft = window.scrollX + window.innerWidth - tipRect.width - minGap;
+    if (left > maxLeft) left = maxLeft;
+    if (left < window.scrollX + minGap) left = window.scrollX + minGap;
+
+    const maxTop = window.scrollY + window.innerHeight - tipRect.height - minGap;
+    if (top > maxTop) {
+        top = window.scrollY + rect.top - tipRect.height - minGap;
+    }
+    if (top < window.scrollY + minGap) top = window.scrollY + minGap;
+
+    tooltip.style.left = `${Math.round(left)}px`;
+    tooltip.style.top = `${Math.round(top)}px`;
+}
+
+function showBuildRequestDetails(build, anchorEl) {
     const buildId = String(build?.build_id || "").trim();
     const request = build?.request ?? {};
-    el("builds-request-title").textContent = buildId
+    const requestJson = JSON.stringify(request, null, 2);
+    el("builds-request-tooltip-title").textContent = buildId
         ? `Build request: ${buildId}`
         : "Build request";
-    el("builds-request-body").textContent = JSON.stringify(request, null, 2);
-    el("builds-request").classList.remove("hidden");
+    const tooltip = el("builds-request-tooltip");
+    el("builds-request-tooltip-body").textContent = requestJson;
+    tooltip.dataset.buildId = buildId;
+    tooltip.dataset.requestJson = requestJson;
+    tooltip.classList.remove("hidden");
+    positionTooltip(tooltip, anchorEl);
+}
+
+function showBuildMessageDetails(buildId, messageText, anchorEl) {
+    const tooltip = el("builds-message-tooltip");
+    const fullText = String(messageText ?? "");
+    el("builds-message-tooltip-title").textContent = buildId
+        ? `Build message: ${buildId}`
+        : "Build message";
+    el("builds-message-tooltip-body").textContent = fullText;
+    tooltip.dataset.buildId = String(buildId || "");
+    tooltip.dataset.messageText = fullText;
+    tooltip.classList.remove("hidden");
+    positionTooltip(tooltip, anchorEl);
 }
 
 function renderBuildProfileOptions(rows) {
@@ -671,28 +734,39 @@ function renderBuildsTable(rows) {
             <td>${renderUpdatedAtCell(r.updated_at)}</td>
             <td>
               ${fullMessage
-        ? `
+                ? `
                   <div class="message-cell">
+                    <span class="message-text" title="${escapeAttr(fullMessage)}">${escapeHtml(fullMessage)}</span>
                     <button
                       type="button"
-                      class="message-copy-icon"
-                      data-act="copy-message"
+                      class="view-icon-btn view-icon-corner"
+                      data-act="show-message"
                       data-id="${escapeAttr(buildId)}"
-                      title="Copy full message"
-                      aria-label="Copy full message"
+                      title="Show full message"
+                      aria-label="Show full message"
                     ></button>
-                    <span class="message-text" title="${escapeAttr(fullMessage)}">${escapeHtml(fullMessage)}</span>
                   </div>
                 `
         : `<span class="muted">-</span>`
     }
             </td>
-            <td class="actions">
-              <button type="button" data-act="params" data-id="${escapeAttr(buildId)}">Params</button>
-              ${canStop ? `<button type="button" data-act="stop" data-id="${escapeAttr(buildId)}">Stop</button>` : ""}
-              ${canRebuild ? `<button type="button" data-act="rebuild" data-id="${escapeAttr(buildId)}">Rebuild</button>` : ""}
-              ${canDelete ? `<button type="button" data-act="delete" data-id="${escapeAttr(buildId)}">Delete</button>` : ""}
-              ${canDownload ? `<button type="button" data-act="download" data-id="${escapeAttr(buildId)}">Download</button>` : ""}
+            <td class="actions build-actions">
+              <div class="actions-wrap">
+                <button
+                  type="button"
+                  class="view-icon-btn view-icon-corner"
+                  data-act="params"
+                  data-id="${escapeAttr(buildId)}"
+                  title="Show build params"
+                  aria-label="Show build params"
+                ></button>
+                <div class="actions-buttons">
+                  ${canStop ? `<button type="button" data-act="stop" data-id="${escapeAttr(buildId)}">Stop</button>` : ""}
+                  ${canRebuild ? `<button type="button" data-act="rebuild" data-id="${escapeAttr(buildId)}">Rebuild</button>` : ""}
+                  ${canDelete ? `<button type="button" data-act="delete" data-id="${escapeAttr(buildId)}">Delete</button>` : ""}
+                  ${canDownload ? `<button type="button" data-act="download" data-id="${escapeAttr(buildId)}">Download</button>` : ""}
+                </div>
+              </div>
             </td>
           </tr>
         `;
@@ -707,19 +781,11 @@ function renderBuildsTable(rows) {
             const buildId = b.getAttribute("data-id");
             const act = b.getAttribute("data-act");
             if (act === "params") {
-                await viewBuildRequest(buildId);
-            } else if (act === "copy-message") {
+                await viewBuildRequest(buildId, b);
+            } else if (act === "show-message") {
                 const fullMessage = String(byId.get(String(buildId || ""))?.message ?? "");
                 if (!fullMessage) return;
-                await copyText(fullMessage);
-                b.classList.add("copied");
-                b.setAttribute("title", "Copied");
-                b.setAttribute("aria-label", "Copied");
-                window.setTimeout(() => {
-                    b.classList.remove("copied");
-                    b.setAttribute("title", "Copy full message");
-                    b.setAttribute("aria-label", "Copy full message");
-                }, 900);
+                await viewBuildMessage(buildId, fullMessage, b);
             } else if (act === "stop") {
                 await cancelBuild(buildId);
             } else if (act === "rebuild") {
@@ -811,10 +877,27 @@ async function fetchBuild(buildId) {
     return apiJson(`${API}/build/${encodeURIComponent(buildId)}`);
 }
 
-async function viewBuildRequest(buildId) {
+async function viewBuildRequest(buildId, anchorEl) {
     showBuildsError("");
+    hideBuildMessageDetails();
+    const tooltip = el("builds-request-tooltip");
+    if (!tooltip.classList.contains("hidden") && tooltip.dataset.buildId === String(buildId || "")) {
+        hideBuildRequestDetails();
+        return;
+    }
     const build = await fetchBuild(buildId);
-    showBuildRequestDetails(build);
+    showBuildRequestDetails(build, anchorEl);
+}
+
+async function viewBuildMessage(buildId, fullMessage, anchorEl) {
+    showBuildsError("");
+    hideBuildRequestDetails();
+    const tooltip = el("builds-message-tooltip");
+    if (!tooltip.classList.contains("hidden") && tooltip.dataset.buildId === String(buildId || "")) {
+        hideBuildMessageDetails();
+        return;
+    }
+    showBuildMessageDetails(buildId, fullMessage, anchorEl);
 }
 
 async function createBuild() {
@@ -999,7 +1082,53 @@ function boot() {
 
     el("builds-refresh").addEventListener("click", () => refreshBuilds().catch((e) => showBuildsError(e.message || e)));
     el("builds-create").addEventListener("click", () => createBuild().catch((e) => showBuildsError(e.message || e)));
-    el("builds-request-close").addEventListener("click", hideBuildRequestDetails);
+    el("builds-request-tooltip-copy").addEventListener("click", async (event) => {
+        const tooltip = el("builds-request-tooltip");
+        const requestJson = String(tooltip.dataset.requestJson || "");
+        if (!requestJson) return;
+        const btn = event.currentTarget;
+        if (!(btn instanceof HTMLButtonElement)) return;
+        await copyText(requestJson);
+        btn.classList.add("copied");
+        btn.setAttribute("title", "Copied");
+        btn.setAttribute("aria-label", "Copied");
+        window.setTimeout(() => {
+            btn.classList.remove("copied");
+            btn.setAttribute("title", "Copy request JSON");
+            btn.setAttribute("aria-label", "Copy request JSON");
+        }, 900);
+    });
+    el("builds-message-tooltip-copy").addEventListener("click", async (event) => {
+        const tooltip = el("builds-message-tooltip");
+        const messageText = String(tooltip.dataset.messageText || "");
+        if (!messageText) return;
+        const btn = event.currentTarget;
+        if (!(btn instanceof HTMLButtonElement)) return;
+        await copyText(messageText);
+        btn.classList.add("copied");
+        btn.setAttribute("title", "Copied");
+        btn.setAttribute("aria-label", "Copied");
+        window.setTimeout(() => {
+            btn.classList.remove("copied");
+            btn.setAttribute("title", "Copy full message");
+            btn.setAttribute("aria-label", "Copy full message");
+        }, 900);
+    });
+    document.addEventListener("click", (event) => {
+        const requestTooltip = el("builds-request-tooltip");
+        const messageTooltip = el("builds-message-tooltip");
+        if (requestTooltip.classList.contains("hidden") && messageTooltip.classList.contains("hidden")) return;
+        const target = event.target;
+        if (!(target instanceof Node)) return;
+        if (requestTooltip.contains(target) || messageTooltip.contains(target)) return;
+        if (target instanceof Element && target.closest('button[data-act="params"], button[data-act="show-message"]')) return;
+        hideBuildTooltips();
+    });
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") hideBuildTooltips();
+    });
+    window.addEventListener("resize", hideBuildTooltips);
+    window.addEventListener("scroll", hideBuildTooltips, { passive: true });
 
     el("lists-refresh").addEventListener("click", () => refreshLists().catch(() => { }));
     el("lists-create").addEventListener("click", () => openListEditor(null).catch(() => { }));
@@ -1010,7 +1139,7 @@ function boot() {
     el("files-upload").addEventListener("click", () => uploadFiles().catch((e) => showFilesError(e.message || e)));
 
     setTab("builds");
-    hideBuildRequestDetails();
+    hideBuildTooltips();
     refreshBuilds().catch((e) => showBuildsError(e.message || e));
     refreshLists().catch(() => { });
     refreshProfiles().catch(() => { });

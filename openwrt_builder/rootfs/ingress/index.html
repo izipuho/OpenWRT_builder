@@ -27,12 +27,35 @@
             </div>
             <div id="builds-table" class="table"></div>
             <pre id="builds-error" class="error hidden"></pre>
-            <div id="builds-request" class="editor hidden">
-                <div class="toolbar">
-                    <h2 id="builds-request-title">Build request</h2>
-                    <button id="builds-request-close" type="button">Close</button>
+            <div id="builds-request-tooltip" class="request-tooltip hidden" role="dialog" aria-live="polite">
+                <div class="request-tooltip-head">
+                    <div id="builds-request-tooltip-title" class="request-tooltip-title">Build request</div>
                 </div>
-                <pre id="builds-request-body" class="json-view"></pre>
+                <div class="json-wrap">
+                    <button
+                        id="builds-request-tooltip-copy"
+                        type="button"
+                        class="message-copy-icon request-copy-icon"
+                        title="Copy request JSON"
+                        aria-label="Copy request JSON"
+                    ></button>
+                    <pre id="builds-request-tooltip-body" class="json-view"></pre>
+                </div>
+            </div>
+            <div id="builds-message-tooltip" class="request-tooltip hidden" role="dialog" aria-live="polite">
+                <div class="request-tooltip-head">
+                    <div id="builds-message-tooltip-title" class="request-tooltip-title">Build message</div>
+                </div>
+                <div class="json-wrap">
+                    <button
+                        id="builds-message-tooltip-copy"
+                        type="button"
+                        class="message-copy-icon request-copy-icon"
+                        title="Copy full message"
+                        aria-label="Copy full message"
+                    ></button>
+                    <pre id="builds-message-tooltip-body" class="json-view"></pre>
+                </div>
             </div>
 
             <div class="editor build-launch">
