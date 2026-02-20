@@ -562,6 +562,31 @@ function showBuildsError(err = "") {
     el("builds-error").classList.toggle("hidden", !msg);
 }
 
+function renderBuildStateBadge(rawState) {
+    const state = String(rawState || "").trim().toLowerCase();
+    const known = new Set(["queued", "running", "done", "failed", "canceled"]);
+    const normalized = known.has(state) ? state : "unknown";
+    const label = state || "unknown";
+    return `<span class="state-badge state-${escapeAttr(normalized)}">${escapeHtml(label)}</span>`;
+}
+
+async function copyText(text) {
+    const value = String(text ?? "");
+    if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+        return;
+    }
+    const node = document.createElement("textarea");
+    node.value = value;
+    node.setAttribute("readonly", "");
+    node.style.position = "absolute";
+    node.style.left = "-9999px";
+    document.body.appendChild(node);
+    node.select();
+    document.execCommand("copy");
+    document.body.removeChild(node);
+}
+
 function hideBuildRequestDetails() {
     el("builds-request").classList.add("hidden");
     el("builds-request-body").textContent = "";
@@ -623,6 +648,7 @@ function renderBuildVersionOptions(payload = {}) {
 
 function renderBuildsTable(rows) {
     const sortedRows = sortByUpdatedAtDesc(rows);
+    const byId = new Map(sortedRows.map((row) => [String(row?.build_id || ""), row]));
     const html = `
     <table>
       <thead>
@@ -636,13 +662,31 @@ function renderBuildsTable(rows) {
         const canDelete = state !== "running";
         const canDownload = state === "done";
         const canRebuild = state !== "running";
+        const fullMessage = String(r.message ?? "");
         return `
           <tr>
             <td>${escapeHtml(buildId)}</td>
-            <td>${escapeHtml(state)}</td>
+            <td>${renderBuildStateBadge(state)}</td>
             <td>${escapeHtml(String(r.progress ?? ""))}%</td>
             <td>${renderUpdatedAtCell(r.updated_at)}</td>
-            <td>${escapeHtml(r.message ?? "")}</td>
+            <td>
+              ${fullMessage
+        ? `
+                  <div class="message-cell">
+                    <button
+                      type="button"
+                      class="message-copy-icon"
+                      data-act="copy-message"
+                      data-id="${escapeAttr(buildId)}"
+                      title="Copy full message"
+                      aria-label="Copy full message"
+                    ></button>
+                    <span class="message-text" title="${escapeAttr(fullMessage)}">${escapeHtml(fullMessage)}</span>
+                  </div>
+                `
+        : `<span class="muted">-</span>`
+    }
+            </td>
             <td class="actions">
               <button type="button" data-act="params" data-id="${escapeAttr(buildId)}">Params</button>
               ${canStop ? `<button type="button" data-act="stop" data-id="${escapeAttr(buildId)}">Stop</button>` : ""}
@@ -664,6 +708,18 @@ function renderBuildsTable(rows) {
             const act = b.getAttribute("data-act");
             if (act === "params") {
                 await viewBuildRequest(buildId);
+            } else if (act === "copy-message") {
+                const fullMessage = String(byId.get(String(buildId || ""))?.message ?? "");
+                if (!fullMessage) return;
+                await copyText(fullMessage);
+                b.classList.add("copied");
+                b.setAttribute("title", "Copied");
+                b.setAttribute("aria-label", "Copied");
+                window.setTimeout(() => {
+                    b.classList.remove("copied");
+                    b.setAttribute("title", "Copy full message");
+                    b.setAttribute("aria-label", "Copy full message");
+                }, 900);
             } else if (act === "stop") {
                 await cancelBuild(buildId);
             } else if (act === "rebuild") {

@@ -132,6 +132,132 @@ button:active {
     white-space: nowrap;
 }
 
+.state-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.state-badge::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.state-queued {
+    color: #666;
+    background: #f2f2f2;
+    border-color: #d8d8d8;
+}
+
+.state-running {
+    color: #0c5ea8;
+    background: #e8f3ff;
+    border-color: #acd2f3;
+}
+
+.state-done {
+    color: #1f7a35;
+    background: #e8f6ec;
+    border-color: #b5dfc0;
+}
+
+.state-failed {
+    color: #ab1d1d;
+    background: #fdecec;
+    border-color: #f0b4b4;
+}
+
+.state-canceled {
+    color: #915400;
+    background: #fff4e3;
+    border-color: #f0d1a6;
+}
+
+.state-unknown {
+    color: #555;
+    background: #f3f3f3;
+    border-color: #ddd;
+}
+
+.message-cell {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+    padding-right: 30px;
+}
+
+.message-text {
+    display: -webkit-box;
+    min-width: 0;
+    width: 100%;
+    overflow: hidden;
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.25;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+}
+
+.message-copy-icon {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+.message-copy-icon::before,
+.message-copy-icon::after {
+    content: "";
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border: 1.5px solid #666;
+    border-radius: 2px;
+    background: #fff;
+}
+
+.message-copy-icon::before {
+    top: 6px;
+    left: 5px;
+}
+
+.message-copy-icon::after {
+    top: 4px;
+    left: 8px;
+}
+
+.message-copy-icon.copied {
+    background: transparent;
+}
+
+.message-copy-icon.copied::before,
+.message-copy-icon.copied::after {
+    border-color: #2b8a44;
+}
+
+.message-copy-icon:hover::before,
+.message-copy-icon:hover::after,
+.message-copy-icon:focus-visible::before,
+.message-copy-icon:focus-visible::after {
+    border-color: #333;
+}
+
 .editor {
     margin-top: 16px;
     border: 1px solid var(--border);
