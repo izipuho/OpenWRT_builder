@@ -24,6 +24,8 @@ This module MUST NOT:
 from __future__ import annotations
 
 import json
+import time
+from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest, urlopen
 
@@ -31,7 +33,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import ValidationError
 
-from openwrt_builder.api.errors import http_502
+from openwrt_builder.api.errors import http_404, http_502
 from openwrt_builder.api.builds_errors import (
     invalid_build_payload_error,
     map_cancel_build_error,
@@ -51,7 +53,268 @@ from openwrt_builder.api.builds_schemas import (
 
 
 router = APIRouter(prefix="/api/v1", tags=["builds"])
-SYSUPGRADE_LATEST_URL = "https://sysupgrade.openwrt.org/api/v1/latest"
+SYSUPGRADE_OVERVIEW_URL = "https://sysupgrade.openwrt.org/json/v1/overview.json"
+_SYSUPGRADE_OVERVIEW_TTL_SECONDS = 300.0
+_sysupgrade_overview_cache: dict[str, Any] | list[Any] | None = None
+_sysupgrade_overview_cached_at_monotonic = 0.0
+
+
+def _fetch_sysupgrade_overview() -> dict[str, Any] | list[Any]:
+    """Load sysupgrade overview payload with a small in-process cache."""
+    global _sysupgrade_overview_cache, _sysupgrade_overview_cached_at_monotonic
+
+    now = time.monotonic()
+    has_fresh_cache = (
+        _sysupgrade_overview_cache is not None
+        and (now - _sysupgrade_overview_cached_at_monotonic) < _SYSUPGRADE_OVERVIEW_TTL_SECONDS
+    )
+    if has_fresh_cache:
+        return _sysupgrade_overview_cache
+
+    try:
+        req = UrlRequest(
+            SYSUPGRADE_OVERVIEW_URL,
+            headers={
+                "Accept": "application/json",
+                "User-Agent": "openwrt-builder/1.0",
+            },
+        )
+        with urlopen(req, timeout=8) as res:
+            payload = json.loads(res.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError) as e:
+        # Prefer stale data over hard failure when upstream is temporarily unavailable.
+        if _sysupgrade_overview_cache is not None:
+            return _sysupgrade_overview_cache
+        raise http_502(e)
+
+    if not isinstance(payload, (dict, list)):
+        raise http_502(ValueError("sysupgrade overview returned unexpected payload type"))
+
+    _sysupgrade_overview_cache = payload
+    _sysupgrade_overview_cached_at_monotonic = now
+    return payload
+
+
+def _extract_versions_from_overview(payload: dict[str, Any] | list[Any]) -> list[str]:
+    """Extract version list from overview payload into latest-first ordering."""
+    versions: list[str] = []
+
+    if isinstance(payload, dict):
+        direct_versions = payload.get("versions")
+        if isinstance(direct_versions, list):
+            for item in direct_versions:
+                if isinstance(item, str):
+                    v = item.strip()
+                    if v:
+                        versions.append(v)
+                elif isinstance(item, dict):
+                    raw_version = item.get("version")
+                    if isinstance(raw_version, str) and raw_version.strip():
+                        versions.append(raw_version.strip())
+        elif isinstance(direct_versions, dict):
+            for raw_version in direct_versions.keys():
+                if isinstance(raw_version, str) and raw_version.strip():
+                    versions.append(raw_version.strip())
+
+        if not versions:
+            raw_latest = payload.get("latest")
+            if isinstance(raw_latest, list):
+                for item in raw_latest:
+                    if isinstance(item, str) and item.strip():
+                        versions.append(item.strip())
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for v in versions:
+        if v in seen:
+            continue
+        seen.add(v)
+        deduped.append(v)
+    return deduped
+
+
+def _platform_from_profile_node(node: Any) -> str | None:
+    if isinstance(node, str):
+        value = node.strip()
+        return value or None
+    if not isinstance(node, dict):
+        return None
+    for key in ("id", "name", "profile", "platform", "device"):
+        raw = node.get(key)
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+    return None
+
+
+def _normalize_target_subtarget(target_raw: str, subtarget_raw: str | None = None) -> tuple[str, str | None]:
+    target = str(target_raw or "").strip()
+    subtarget = str(subtarget_raw or "").strip() or None
+    if target and "/" in target and subtarget is None:
+        parts = target.split("/", 1)
+        target = parts[0].strip()
+        subtarget = parts[1].strip() or None
+    return target, subtarget
+
+
+def _add_tree_leaf(
+    tree: dict[str, dict[str, dict[str, set[str]]]],
+    version: str,
+    target: str,
+    subtarget: str,
+    platform: str | None = None,
+) -> None:
+    versions = tree.setdefault(version, {})
+    targets = versions.setdefault(target, {})
+    profiles = targets.setdefault(subtarget, set())
+    if platform:
+        profiles.add(platform)
+
+
+def _parse_profiles_node(raw_profiles: Any) -> list[str]:
+    if not isinstance(raw_profiles, list):
+        return []
+    out: list[str] = []
+    for item in raw_profiles:
+        platform = _platform_from_profile_node(item)
+        if platform:
+            out.append(platform)
+    return out
+
+
+def _parse_subtargets_node(
+    tree: dict[str, dict[str, dict[str, set[str]]]],
+    version: str,
+    target: str,
+    raw_subtargets: Any,
+) -> None:
+    if isinstance(raw_subtargets, dict):
+        for key, value in raw_subtargets.items():
+            subtarget = str(key or "").strip()
+            if not subtarget:
+                continue
+            if isinstance(value, dict):
+                platforms = _parse_profiles_node(value.get("profiles"))
+            else:
+                platforms = _parse_profiles_node(value)
+            _add_tree_leaf(tree, version, target, subtarget)
+            for platform in platforms:
+                _add_tree_leaf(tree, version, target, subtarget, platform)
+        return
+
+    if not isinstance(raw_subtargets, list):
+        return
+
+    for item in raw_subtargets:
+        if isinstance(item, str):
+            subtarget = item.strip()
+            if subtarget:
+                _add_tree_leaf(tree, version, target, subtarget)
+            continue
+        if not isinstance(item, dict):
+            continue
+        subtarget = str(item.get("subtarget") or item.get("name") or "").strip()
+        if not subtarget:
+            continue
+        _add_tree_leaf(tree, version, target, subtarget)
+        for platform in _parse_profiles_node(item.get("profiles")):
+            _add_tree_leaf(tree, version, target, subtarget, platform)
+
+
+def _parse_targets_node(
+    tree: dict[str, dict[str, dict[str, set[str]]]],
+    version: str,
+    raw_targets: Any,
+) -> None:
+    if isinstance(raw_targets, dict):
+        for key, value in raw_targets.items():
+            target, subtarget_from_key = _normalize_target_subtarget(str(key or ""))
+            if not target:
+                continue
+            if isinstance(value, dict):
+                raw_subtargets = value.get("subtargets")
+                if raw_subtargets is not None:
+                    _parse_subtargets_node(tree, version, target, raw_subtargets)
+                    continue
+                platforms = _parse_profiles_node(value.get("profiles"))
+            else:
+                platforms = _parse_profiles_node(value)
+
+            effective_subtarget = subtarget_from_key or "generic"
+            _add_tree_leaf(tree, version, target, effective_subtarget)
+            for platform in platforms:
+                _add_tree_leaf(tree, version, target, effective_subtarget, platform)
+        return
+
+    if not isinstance(raw_targets, list):
+        return
+
+    for item in raw_targets:
+        if isinstance(item, str):
+            target, subtarget = _normalize_target_subtarget(item)
+            if target and subtarget:
+                _add_tree_leaf(tree, version, target, subtarget)
+            continue
+        if not isinstance(item, dict):
+            continue
+
+        target, subtarget = _normalize_target_subtarget(
+            str(item.get("target") or item.get("name") or ""),
+            str(item.get("subtarget") or ""),
+        )
+        if not target:
+            continue
+
+        raw_subtargets = item.get("subtargets")
+        if raw_subtargets is not None:
+            _parse_subtargets_node(tree, version, target, raw_subtargets)
+            continue
+
+        effective_subtarget = subtarget or "generic"
+        _add_tree_leaf(tree, version, target, effective_subtarget)
+        for platform in _parse_profiles_node(item.get("profiles")):
+            _add_tree_leaf(tree, version, target, effective_subtarget, platform)
+
+
+def _build_overview_tree(payload: dict[str, Any] | list[Any]) -> dict[str, dict[str, dict[str, set[str]]]]:
+    """
+    Build index: version -> target -> subtarget -> {platforms}.
+
+    Overview payload has had schema variations, so parsing here is intentionally
+    tolerant for list/dict variants.
+    """
+    tree: dict[str, dict[str, dict[str, set[str]]]] = {}
+
+    def parse_version_entry(raw_version: Any, node: Any) -> None:
+        if not isinstance(raw_version, str):
+            return
+        version = raw_version.strip()
+        if not version:
+            return
+        if isinstance(node, dict):
+            raw_targets = node.get("targets")
+            if raw_targets is not None:
+                _parse_targets_node(tree, version, raw_targets)
+
+    if isinstance(payload, dict):
+        versions_node = payload.get("versions")
+        if isinstance(versions_node, list):
+            for item in versions_node:
+                if isinstance(item, str):
+                    parse_version_entry(item, {})
+                elif isinstance(item, dict):
+                    parse_version_entry(item.get("version"), item)
+        elif isinstance(versions_node, dict):
+            for key, value in versions_node.items():
+                if isinstance(value, dict):
+                    parse_version_entry(key, value)
+                else:
+                    parse_version_entry(key, {"targets": value})
+    elif isinstance(payload, list):
+        for item in payload:
+            if isinstance(item, dict):
+                parse_version_entry(item.get("version"), item)
+
+    return tree
 
 
 # =========================
@@ -144,21 +407,62 @@ def get_builds(req: Request):
 
 @router.get("/build-versions")
 def get_build_versions():
-    """Return sysupgrade latest payload as-is."""
-    try:
-        req = UrlRequest(
-            SYSUPGRADE_LATEST_URL,
-            headers={
-                "Accept": "application/json",
-                "User-Agent": "openwrt-builder/1.0",
-            },
-        )
-        with urlopen(req, timeout=8) as res:
-            payload = json.loads(res.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError) as e:
-        raise http_502(e)
+    """Return build versions derived from sysupgrade overview payload."""
+    overview = _fetch_sysupgrade_overview()
+    latest = _extract_versions_from_overview(overview)
+    if not latest:
+        raise http_502(ValueError("sysupgrade overview does not contain versions"))
+    return {"latest": latest}
 
-    return payload
+
+@router.get("/build-targets")
+def get_build_targets(version: str):
+    """Return available targets for a version."""
+    overview = _fetch_sysupgrade_overview()
+    tree = _build_overview_tree(overview)
+    if version not in tree:
+        raise http_404("version_not_found")
+    return {"version": version, "targets": sorted(tree[version].keys())}
+
+
+@router.get("/build-subtargets")
+def get_build_subtargets(version: str, target: str):
+    """Return available subtargets for a version/target."""
+    overview = _fetch_sysupgrade_overview()
+    tree = _build_overview_tree(overview)
+    version_targets = tree.get(version)
+    if not version_targets:
+        raise http_404("version_not_found")
+    target_subtargets = version_targets.get(target)
+    if target_subtargets is None:
+        raise http_404("target_not_found")
+    return {
+        "version": version,
+        "target": target,
+        "subtargets": sorted(target_subtargets.keys()),
+    }
+
+
+@router.get("/build-platforms")
+def get_build_platforms(version: str, target: str, subtarget: str):
+    """Return available platform/profile names for version/target/subtarget."""
+    overview = _fetch_sysupgrade_overview()
+    tree = _build_overview_tree(overview)
+    version_targets = tree.get(version)
+    if not version_targets:
+        raise http_404("version_not_found")
+    target_subtargets = version_targets.get(target)
+    if target_subtargets is None:
+        raise http_404("target_not_found")
+    platforms = target_subtargets.get(subtarget)
+    if platforms is None:
+        raise http_404("subtarget_not_found")
+    return {
+        "version": version,
+        "target": target,
+        "subtarget": subtarget,
+        "platforms": sorted(platforms),
+    }
 
 
 @router.get("/build/{build_id}", response_model=BuildOut)
