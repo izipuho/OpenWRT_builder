@@ -291,17 +291,25 @@ def _targets_for_latest_version(payload: dict[str, Any] | list[Any], version: st
     if version not in latest_versions:
         return None
 
-    # Current ASU layout: find branch that contains the selected latest version.
-    for _, branch_node in payload.items():
-        if not isinstance(branch_node, dict):
-            continue
-        branch_versions = branch_node.get("versions")
-        if not isinstance(branch_versions, list):
-            continue
-        has_version = any(isinstance(v, str) and v.strip() == version for v in branch_versions)
-        if not has_version:
-            continue
-        return branch_node.get("targets")
+    # Derive branch key directly from version string:
+    # 25.12.0-rc5 -> 25.12, 24.10.5 -> 24.10, 23.05.6 -> 23.05
+    branch_key = ""
+    parts = version.split(".")
+    if len(parts) >= 2 and parts[0].strip() and parts[1].strip():
+        branch_key = f"{parts[0].strip()}.{parts[1].strip()}"
+
+    # Current ASU layout: branch map is usually under payload["branches"].
+    branch_root = payload.get("branches")
+    if isinstance(branch_root, dict) and branch_key:
+        branch_node = branch_root.get(branch_key)
+        if isinstance(branch_node, dict):
+            return branch_node.get("targets")
+
+    # Backward compatibility: some layouts expose branches at top-level.
+    if branch_key:
+        branch_node = payload.get(branch_key)
+        if isinstance(branch_node, dict):
+            return branch_node.get("targets")
 
     # Backward compatibility: direct version-keyed object.
     version_node = payload.get(version)
