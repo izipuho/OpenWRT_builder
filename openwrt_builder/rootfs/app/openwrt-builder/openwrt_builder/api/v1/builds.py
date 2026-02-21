@@ -96,43 +96,33 @@ def _fetch_sysupgrade_overview() -> dict[str, Any] | list[Any]:
 
 
 def _extract_versions_from_overview(payload: dict[str, Any] | list[Any]) -> list[str]:
-    """Extract version list from overview payload into latest-first ordering."""
+    """Extract latest version list from overview payload."""
     versions: list[str] = []
 
     if isinstance(payload, dict):
-        direct_versions = payload.get("versions")
-        if isinstance(direct_versions, list):
-            for item in direct_versions:
-                if isinstance(item, str):
-                    v = item.strip()
-                    if v:
-                        versions.append(v)
-                elif isinstance(item, dict):
-                    raw_version = item.get("version")
-                    if isinstance(raw_version, str) and raw_version.strip():
-                        versions.append(raw_version.strip())
-        elif isinstance(direct_versions, dict):
-            for raw_version in direct_versions.keys():
-                if isinstance(raw_version, str) and raw_version.strip():
-                    versions.append(raw_version.strip())
-
-        if not versions:
-            raw_latest = payload.get("latest")
-            if isinstance(raw_latest, list):
-                for item in raw_latest:
-                    if isinstance(item, str) and item.strip():
-                        versions.append(item.strip())
-
-        # Current ASU overview layout: top-level branches contain their own versions.
-        for _, branch in payload.items():
-            if not isinstance(branch, dict):
-                continue
-            branch_versions = branch.get("versions")
-            if not isinstance(branch_versions, list):
-                continue
-            for item in branch_versions:
+        raw_latest = payload.get("latest")
+        if isinstance(raw_latest, list):
+            for item in raw_latest:
                 if isinstance(item, str) and item.strip():
                     versions.append(item.strip())
+
+        if not versions:
+            # Backward compatibility with legacy payload layouts.
+            direct_versions = payload.get("versions")
+            if isinstance(direct_versions, list):
+                for item in direct_versions:
+                    if isinstance(item, str):
+                        v = item.strip()
+                        if v:
+                            versions.append(v)
+                    elif isinstance(item, dict):
+                        raw_version = item.get("version")
+                        if isinstance(raw_version, str) and raw_version.strip():
+                            versions.append(raw_version.strip())
+            elif isinstance(direct_versions, dict):
+                for raw_version in direct_versions.keys():
+                    if isinstance(raw_version, str) and raw_version.strip():
+                        versions.append(raw_version.strip())
 
     deduped: list[str] = []
     seen: set[str] = set()
@@ -292,71 +282,39 @@ def _parse_targets_node(
             _add_tree_leaf(tree, version, target, effective_subtarget, platform)
 
 
-def _build_overview_tree(payload: dict[str, Any] | list[Any]) -> dict[str, dict[str, dict[str, set[str]]]]:
-    """
-    Build index: version -> target -> subtarget -> {platforms}.
+def _targets_for_latest_version(payload: dict[str, Any] | list[Any], version: str) -> Any | None:
+    """Resolve raw targets for a version from latest-only branch data."""
+    if not isinstance(payload, dict):
+        return None
 
-    Overview payload has had schema variations, so parsing here is intentionally
-    tolerant for list/dict variants.
-    """
+    latest_versions = set(_extract_versions_from_overview(payload))
+    if version not in latest_versions:
+        return None
+
+    # Current ASU layout: find branch that contains the selected latest version.
+    for _, branch_node in payload.items():
+        if not isinstance(branch_node, dict):
+            continue
+        branch_versions = branch_node.get("versions")
+        if not isinstance(branch_versions, list):
+            continue
+        has_version = any(isinstance(v, str) and v.strip() == version for v in branch_versions)
+        if not has_version:
+            continue
+        return branch_node.get("targets")
+
+    # Backward compatibility: direct version-keyed object.
+    version_node = payload.get(version)
+    if isinstance(version_node, dict):
+        return version_node.get("targets")
+
+    return None
+
+
+def _tree_for_version_targets(version: str, raw_targets: Any) -> dict[str, dict[str, set[str]]]:
     tree: dict[str, dict[str, dict[str, set[str]]]] = {}
-
-    def parse_version_entry(raw_version: Any, node: Any) -> None:
-        if not isinstance(raw_version, str):
-            return
-        version = raw_version.strip()
-        if not version:
-            return
-        if isinstance(node, dict):
-            raw_targets = node.get("targets")
-            if raw_targets is not None:
-                _parse_targets_node(tree, version, raw_targets)
-
-    if isinstance(payload, dict):
-        # Current ASU overview layout:
-        # {
-        #   "25.12": {"versions": [...], "targets": {...}},
-        #   "24.10": {"versions": [...], "targets": {...}},
-        #   ...
-        # }
-        for _, branch_node in payload.items():
-            if not isinstance(branch_node, dict):
-                continue
-            branch_versions = branch_node.get("versions")
-            branch_targets = branch_node.get("targets")
-            if not isinstance(branch_versions, list) or branch_targets is None:
-                continue
-            for raw_version in branch_versions:
-                parse_version_entry(raw_version, {"targets": branch_targets})
-
-        versions_node = payload.get("versions")
-        if isinstance(versions_node, list):
-            for item in versions_node:
-                if isinstance(item, str):
-                    fallback_node = payload.get(item)
-                    parse_version_entry(item, fallback_node if isinstance(fallback_node, dict) else {})
-                elif isinstance(item, dict):
-                    parse_version_entry(item.get("version"), item)
-        elif isinstance(versions_node, dict):
-            for key, value in versions_node.items():
-                if isinstance(value, dict):
-                    parse_version_entry(key, value)
-                else:
-                    parse_version_entry(key, {"targets": value})
-
-        # Alternate layout: payload["targets"] may contain version-keyed maps.
-        raw_targets_root = payload.get("targets")
-        if isinstance(raw_targets_root, dict):
-            for key, value in raw_targets_root.items():
-                if isinstance(key, str) and isinstance(value, (dict, list)):
-                    if key in tree or key in _extract_versions_from_overview(payload):
-                        parse_version_entry(key, {"targets": value})
-    elif isinstance(payload, list):
-        for item in payload:
-            if isinstance(item, dict):
-                parse_version_entry(item.get("version"), item)
-
-    return tree
+    _parse_targets_node(tree, version, raw_targets)
+    return tree.get(version, {})
 
 
 # =========================
@@ -461,21 +419,21 @@ def get_build_versions():
 def get_build_targets(version: str):
     """Return available targets for a version."""
     overview = _fetch_sysupgrade_overview()
-    tree = _build_overview_tree(overview)
-    known_versions = set(_extract_versions_from_overview(overview))
-    if version not in tree and version not in known_versions:
+    raw_targets = _targets_for_latest_version(overview, version)
+    if raw_targets is None:
         raise http_404("version_not_found")
-    return {"version": version, "targets": sorted(tree.get(version, {}).keys())}
+    targets_tree = _tree_for_version_targets(version, raw_targets)
+    return {"version": version, "targets": sorted(targets_tree.keys())}
 
 
 @router.get("/build-subtargets")
 def get_build_subtargets(version: str, target: str):
     """Return available subtargets for a version/target."""
     overview = _fetch_sysupgrade_overview()
-    tree = _build_overview_tree(overview)
-    version_targets = tree.get(version)
-    if not version_targets:
+    raw_targets = _targets_for_latest_version(overview, version)
+    if raw_targets is None:
         raise http_404("version_not_found")
+    version_targets = _tree_for_version_targets(version, raw_targets)
     target_subtargets = version_targets.get(target)
     if target_subtargets is None:
         raise http_404("target_not_found")
@@ -490,10 +448,10 @@ def get_build_subtargets(version: str, target: str):
 def get_build_platforms(version: str, target: str, subtarget: str):
     """Return available platform/profile names for version/target/subtarget."""
     overview = _fetch_sysupgrade_overview()
-    tree = _build_overview_tree(overview)
-    version_targets = tree.get(version)
-    if not version_targets:
+    raw_targets = _targets_for_latest_version(overview, version)
+    if raw_targets is None:
         raise http_404("version_not_found")
+    version_targets = _tree_for_version_targets(version, raw_targets)
     target_subtargets = version_targets.get(target)
     if target_subtargets is None:
         raise http_404("target_not_found")
