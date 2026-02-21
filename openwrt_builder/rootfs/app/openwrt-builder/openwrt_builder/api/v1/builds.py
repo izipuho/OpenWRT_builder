@@ -317,6 +317,16 @@ def _tree_for_version_targets(version: str, raw_targets: Any) -> dict[str, dict[
     return tree.get(version, {})
 
 
+def _serialize_version_tree(tree: dict[str, dict[str, set[str]]]) -> dict[str, dict[str, list[str]]]:
+    out: dict[str, dict[str, list[str]]] = {}
+    for target in sorted(tree.keys()):
+        subtargets = tree[target]
+        out[target] = {}
+        for subtarget in sorted(subtargets.keys()):
+            out[target][subtarget] = sorted(subtargets[subtarget])
+    return out
+
+
 # =========================
 # Registry interface
 # =========================
@@ -464,6 +474,26 @@ def get_build_platforms(version: str, target: str, subtarget: str):
         "subtarget": subtarget,
         "platforms": sorted(platforms),
     }
+
+
+@router.get("/build-tree")
+def get_build_tree():
+    """Return full latest-only tree: version -> target -> subtarget -> platforms."""
+    overview = _fetch_sysupgrade_overview()
+    latest = _extract_versions_from_overview(overview)
+    if not latest:
+        raise http_502(ValueError("sysupgrade overview does not contain versions"))
+
+    tree: dict[str, dict[str, dict[str, list[str]]]] = {}
+    for version in latest:
+        raw_targets = _targets_for_latest_version(overview, version)
+        if raw_targets is None:
+            tree[version] = {}
+            continue
+        version_tree = _tree_for_version_targets(version, raw_targets)
+        tree[version] = _serialize_version_tree(version_tree)
+
+    return {"latest": latest, "tree": tree}
 
 
 @router.get("/build/{build_id}", response_model=BuildOut)
