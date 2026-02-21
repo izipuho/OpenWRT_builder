@@ -29,6 +29,7 @@ The add-on is intended to be used as a **build backend** for Home Assistant inte
 - Modify running systems.
 - Replace OpenWrt ASU (Attended Sysupgrade).
 
+
 ## Configuration
 
 Typical configuration parameters:
@@ -71,6 +72,22 @@ Artifacts are intended to be:
 - downloaded manually
 - consumed by a Home Assistant integration
 - uploaded to an OpenWrt device via sysupgrade
+
+
+## Standalone Deployment
+
+A ready-to-run compose template is available:
+
+- `openwrt_builder/docker-compose.standalone.yml`
+
+Quick start:
+
+```bash
+cd openwrt_builder
+docker compose -f docker-compose.standalone.yml up -d --build
+```
+
+For internet-facing installs, set `OPENWRT_BUILDER_CORS_ORIGINS` in your shell environment or project `.env` to explicit UI hostnames.
 
 ## Integration with Home Assistant
 

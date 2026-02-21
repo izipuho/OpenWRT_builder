@@ -1,4 +1,4 @@
-# OpenWRT HA ImageBuilder (Home Assistant Add-on)
+# OpenWRT ImageBuilder (Home Assistant Add-on + Standalone)
 
 Home Assistant add-on that runs OpenWrt ImageBuilder and allows building custom OpenWrt firmware images based on selected profiles and device targets.
 
@@ -31,3 +31,22 @@ Home Assistant add-on that runs OpenWrt ImageBuilder and allows building custom 
 
 MIT
 
+
+
+## Run in standalone mode
+
+```bash
+cd openwrt_builder
+docker compose -f docker-compose.standalone.yml up -d --build
+```
+
+Then open `http://localhost:8080`. For production, set `OPENWRT_BUILDER_CORS_ORIGINS` via shell environment or project `.env` to your real UI hostname(s).
+
+
+## Standalone: current implementation summary
+
+- Standalone launch is provided via `openwrt_builder/docker-compose.standalone.yml`.
+- Core runtime path variables are loaded inside the container from `/etc/openwrt-builder/paths.env`.
+- CORS is controlled by `OPENWRT_BUILDER_CORS_ORIGINS` (comma-separated origins).
+- If `OPENWRT_BUILDER_CORS_ORIGINS` is empty/unset, fallback is permissive (`*`).
+- For internet-facing setups, explicitly set `OPENWRT_BUILDER_CORS_ORIGINS` to your real UI origin(s).

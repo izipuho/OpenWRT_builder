@@ -30,9 +30,7 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
 
     cors_origins_raw = env_str("OPENWRT_BUILDER_CORS_ORIGINS")
-    cors_origins = [origin.strip() for origin in (cors_origins_raw or "").split(",") if origin.strip()]
-    if not cors_origins:
-        cors_origins = ["*"]
+    cors_origins = [origin.strip() for origin in (cors_origins_raw or "").split(",") if origin.strip()] or ["*"]
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
