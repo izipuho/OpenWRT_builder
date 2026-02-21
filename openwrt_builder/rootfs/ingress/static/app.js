@@ -717,6 +717,90 @@ function renderBuildVersionOptions(payload = {}) {
         .join("");
 }
 
+function renderBuildSimpleSelectOptions(selectId, values, {
+    selectedValue = "",
+    emptyLabel = "No options available",
+} = {}) {
+    const select = el(selectId);
+    const normalized = (values || [])
+        .map((v) => String(v || "").trim())
+        .filter(Boolean);
+
+    if (!normalized.length) {
+        select.innerHTML = `<option value="">${escapeHtml(emptyLabel)}</option>`;
+        return "";
+    }
+
+    const selected = normalized.includes(selectedValue) ? selectedValue : normalized[0];
+    select.innerHTML = normalized
+        .map((value) => `<option value="${escapeAttr(value)}" ${value === selected ? "selected" : ""}>${escapeHtml(value)}</option>`)
+        .join("");
+    return selected;
+}
+
+async function fetchBuildTargets(version) {
+    if (!version) return [];
+    const payload = await apiJson(`${API}/build-targets?version=${encodeURIComponent(version)}`);
+    return Array.isArray(payload?.targets) ? payload.targets : [];
+}
+
+async function fetchBuildSubtargets(version, target) {
+    if (!version || !target) return [];
+    const payload = await apiJson(
+        `${API}/build-subtargets?version=${encodeURIComponent(version)}&target=${encodeURIComponent(target)}`
+    );
+    return Array.isArray(payload?.subtargets) ? payload.subtargets : [];
+}
+
+async function fetchBuildPlatforms(version, target, subtarget) {
+    if (!version || !target || !subtarget) return [];
+    const payload = await apiJson(
+        `${API}/build-platforms?version=${encodeURIComponent(version)}&target=${encodeURIComponent(target)}&subtarget=${encodeURIComponent(subtarget)}`
+    );
+    return Array.isArray(payload?.platforms) ? payload.platforms : [];
+}
+
+async function syncBuildSelectors() {
+    const version = String(el("builds-version").value || "").trim();
+    const selectedTarget = String(el("builds-target").value || "").trim();
+    const selectedSubtarget = String(el("builds-subtarget").value || "").trim();
+    const selectedPlatform = String(el("builds-platform").value || "").trim();
+
+    if (!version) {
+        renderBuildSimpleSelectOptions("builds-target", [], { emptyLabel: "Select version first" });
+        renderBuildSimpleSelectOptions("builds-subtarget", [], { emptyLabel: "Select target first" });
+        renderBuildSimpleSelectOptions("builds-platform", [], { emptyLabel: "Select subtarget first" });
+        return;
+    }
+
+    const targets = await fetchBuildTargets(version).catch(() => []);
+    const target = renderBuildSimpleSelectOptions("builds-target", targets, {
+        selectedValue: selectedTarget,
+        emptyLabel: "No targets available",
+    });
+    if (!target) {
+        renderBuildSimpleSelectOptions("builds-subtarget", [], { emptyLabel: "Select target first" });
+        renderBuildSimpleSelectOptions("builds-platform", [], { emptyLabel: "Select subtarget first" });
+        return;
+    }
+
+    const subtargets = await fetchBuildSubtargets(version, target).catch(() => []);
+    const subtarget = renderBuildSimpleSelectOptions("builds-subtarget", subtargets, {
+        selectedValue: selectedSubtarget,
+        emptyLabel: "No subtargets available",
+    });
+    if (!subtarget) {
+        renderBuildSimpleSelectOptions("builds-platform", [], { emptyLabel: "Select subtarget first" });
+        return;
+    }
+
+    const platforms = await fetchBuildPlatforms(version, target, subtarget).catch(() => []);
+    renderBuildSimpleSelectOptions("builds-platform", platforms, {
+        selectedValue: selectedPlatform,
+        emptyLabel: "No platforms available",
+    });
+}
+
 function renderBuildsTable(rows) {
     const sortedRows = sortByUpdatedAtDesc(rows);
     const byId = new Map(sortedRows.map((row) => [String(row?.build_id || ""), row]));
@@ -872,10 +956,11 @@ async function refreshBuilds() {
     const [profiles, builds, versionsPayload] = await Promise.all([
         apiJson(`${API}/profiles`),
         apiJson(`${API}/builds`),
-        apiJson(`${API}/build-versions`).catch(() => ({ versions: [], latest: "" })),
+        apiJson(`${API}/build-versions`).catch(() => ({ latest: [] })),
     ]);
     renderBuildProfileOptions(profiles);
     renderBuildVersionOptions(versionsPayload);
+    await syncBuildSelectors();
     renderBuildsTable(builds);
 }
 
@@ -1146,6 +1231,9 @@ function boot() {
 
     el("builds-refresh").addEventListener("click", () => refreshBuilds().catch((e) => showBuildsError(e.message || e)));
     el("builds-create").addEventListener("click", () => createBuild().catch((e) => showBuildsError(e.message || e)));
+    el("builds-version").addEventListener("change", () => syncBuildSelectors().catch((e) => showBuildsError(e.message || e)));
+    el("builds-target").addEventListener("change", () => syncBuildSelectors().catch((e) => showBuildsError(e.message || e)));
+    el("builds-subtarget").addEventListener("change", () => syncBuildSelectors().catch((e) => showBuildsError(e.message || e)));
     wireBuildImagesSelection();
     el("builds-request-tooltip-copy").addEventListener("click", async (event) => {
         const tooltip = el("builds-request-tooltip");

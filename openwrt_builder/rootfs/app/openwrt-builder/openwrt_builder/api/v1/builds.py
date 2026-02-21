@@ -123,6 +123,17 @@ def _extract_versions_from_overview(payload: dict[str, Any] | list[Any]) -> list
                     if isinstance(item, str) and item.strip():
                         versions.append(item.strip())
 
+        # Current ASU overview layout: top-level branches contain their own versions.
+        for _, branch in payload.items():
+            if not isinstance(branch, dict):
+                continue
+            branch_versions = branch.get("versions")
+            if not isinstance(branch_versions, list):
+                continue
+            for item in branch_versions:
+                if isinstance(item, str) and item.strip():
+                    versions.append(item.strip())
+
     deduped: list[str] = []
     seen: set[str] = set()
     for v in versions:
@@ -194,6 +205,9 @@ def _parse_subtargets_node(
                 continue
             if isinstance(value, dict):
                 platforms = _parse_profiles_node(value.get("profiles"))
+            elif isinstance(value, str):
+                platform = value.strip()
+                platforms = [platform] if platform else []
             else:
                 platforms = _parse_profiles_node(value)
             _add_tree_leaf(tree, version, target, subtarget)
@@ -236,6 +250,9 @@ def _parse_targets_node(
                     _parse_subtargets_node(tree, version, target, raw_subtargets)
                     continue
                 platforms = _parse_profiles_node(value.get("profiles"))
+            elif isinstance(value, str):
+                platform = value.strip()
+                platforms = [platform] if platform else []
             else:
                 platforms = _parse_profiles_node(value)
 
@@ -296,11 +313,28 @@ def _build_overview_tree(payload: dict[str, Any] | list[Any]) -> dict[str, dict[
                 _parse_targets_node(tree, version, raw_targets)
 
     if isinstance(payload, dict):
+        # Current ASU overview layout:
+        # {
+        #   "25.12": {"versions": [...], "targets": {...}},
+        #   "24.10": {"versions": [...], "targets": {...}},
+        #   ...
+        # }
+        for _, branch_node in payload.items():
+            if not isinstance(branch_node, dict):
+                continue
+            branch_versions = branch_node.get("versions")
+            branch_targets = branch_node.get("targets")
+            if not isinstance(branch_versions, list) or branch_targets is None:
+                continue
+            for raw_version in branch_versions:
+                parse_version_entry(raw_version, {"targets": branch_targets})
+
         versions_node = payload.get("versions")
         if isinstance(versions_node, list):
             for item in versions_node:
                 if isinstance(item, str):
-                    parse_version_entry(item, {})
+                    fallback_node = payload.get(item)
+                    parse_version_entry(item, fallback_node if isinstance(fallback_node, dict) else {})
                 elif isinstance(item, dict):
                     parse_version_entry(item.get("version"), item)
         elif isinstance(versions_node, dict):
@@ -309,6 +343,14 @@ def _build_overview_tree(payload: dict[str, Any] | list[Any]) -> dict[str, dict[
                     parse_version_entry(key, value)
                 else:
                     parse_version_entry(key, {"targets": value})
+
+        # Alternate layout: payload["targets"] may contain version-keyed maps.
+        raw_targets_root = payload.get("targets")
+        if isinstance(raw_targets_root, dict):
+            for key, value in raw_targets_root.items():
+                if isinstance(key, str) and isinstance(value, (dict, list)):
+                    if key in tree or key in _extract_versions_from_overview(payload):
+                        parse_version_entry(key, {"targets": value})
     elif isinstance(payload, list):
         for item in payload:
             if isinstance(item, dict):
@@ -420,9 +462,10 @@ def get_build_targets(version: str):
     """Return available targets for a version."""
     overview = _fetch_sysupgrade_overview()
     tree = _build_overview_tree(overview)
-    if version not in tree:
+    known_versions = set(_extract_versions_from_overview(overview))
+    if version not in tree and version not in known_versions:
         raise http_404("version_not_found")
-    return {"version": version, "targets": sorted(tree[version].keys())}
+    return {"version": version, "targets": sorted(tree.get(version, {}).keys())}
 
 
 @router.get("/build-subtargets")
