@@ -65,6 +65,26 @@ body {
     margin: 0;
 }
 
+.build-sections {
+    display: grid;
+    gap: 12px;
+}
+
+.build-section {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px;
+    background: #fcfcfc;
+}
+
+.build-section-title {
+    margin: 0 0 8px 0;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
 .request-tooltip {
     position: absolute;
     z-index: 40;
@@ -91,9 +111,19 @@ body {
 }
 
 .checklist.build-options {
-    margin-top: 12px;
+    margin-top: 0;
     max-height: none;
     grid-template-columns: repeat(2, minmax(180px, 260px));
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    background: transparent;
+}
+
+.checklist.build-images {
+    margin-top: 0;
+    max-height: none;
+    grid-template-columns: repeat(2, minmax(160px, 200px));
     border: 0;
     border-radius: 0;
     padding: 0;
@@ -106,6 +136,17 @@ body {
     max-width: 260px;
     flex: 0 0 260px;
     height: 38px;
+}
+
+.build-run-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.build-run-btn .btn-icon {
+    display: block;
+    fill: currentColor;
 }
 
 #files-input {

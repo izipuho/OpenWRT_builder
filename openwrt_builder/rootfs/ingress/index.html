@@ -60,36 +60,66 @@
 
             <div class="editor build-launch">
                 <h2>Start Build</h2>
-                <div class="toolbar">
-                    <select id="builds-version" class="build-field"></select>
-                    <input id="builds-target" class="build-field" type="text" placeholder="target (e.g. ath79)" />
-                    <input id="builds-subtarget" class="build-field" type="text"
-                        placeholder="subtarget (e.g. generic)" />
-                    <input id="builds-platform" class="build-field" type="text"
-                        placeholder="platform (e.g. tplink_archer-c6-v2)" />
-                    <select id="builds-profile" class="build-field"></select>
-                    <select id="builds-images" class="build-field">
-                        <option value="sysupgrade" selected>sysupgrade</option>
-                        <option value="factory">factory</option>
-                        <option value="both">sysupgrade + factory</option>
-                    </select>
-                </div>
-                <div class="checklist build-options">
-                    <label class="checkitem">
-                        <input id="builds-force" type="checkbox" />
-                        <span class="checktext">
-                            <span class="checktitle">force_rebuild</span>
-                        </span>
-                    </label>
-                    <label class="checkitem">
-                        <input id="builds-debug" type="checkbox" />
-                        <span class="checktext">
-                            <span class="checktitle">debug</span>
-                        </span>
-                    </label>
+                <div class="build-sections">
+                    <section class="build-section">
+                        <h3 class="build-section-title">Version</h3>
+                        <div class="toolbar">
+                            <select id="builds-version" class="build-field"></select>
+                        </div>
+                    </section>
+                    <section class="build-section">
+                        <h3 class="build-section-title">target / subtarget / platform / profile</h3>
+                        <div class="toolbar">
+                            <input id="builds-target" class="build-field" type="text" placeholder="target (e.g. ath79)" />
+                            <input id="builds-subtarget" class="build-field" type="text"
+                                placeholder="subtarget (e.g. generic)" />
+                            <input id="builds-platform" class="build-field" type="text"
+                                placeholder="platform (e.g. tplink_archer-c6-v2)" />
+                            <select id="builds-profile" class="build-field"></select>
+                        </div>
+                    </section>
+                    <section class="build-section">
+                        <h3 class="build-section-title">sysupgrade / factory</h3>
+                        <div class="checklist build-images">
+                            <label class="checkitem">
+                                <input type="checkbox" data-group="builds-images" value="sysupgrade" checked />
+                                <span class="checktext">
+                                    <span class="checktitle">sysupgrade</span>
+                                </span>
+                            </label>
+                            <label class="checkitem">
+                                <input type="checkbox" data-group="builds-images" value="factory" />
+                                <span class="checktext">
+                                    <span class="checktitle">factory</span>
+                                </span>
+                            </label>
+                        </div>
+                    </section>
+                    <section class="build-section">
+                        <h3 class="build-section-title">build options</h3>
+                        <div class="checklist build-options">
+                            <label class="checkitem">
+                                <input id="builds-force" type="checkbox" />
+                                <span class="checktext">
+                                    <span class="checktitle">force_rebuild</span>
+                                </span>
+                            </label>
+                            <label class="checkitem">
+                                <input id="builds-debug" type="checkbox" />
+                                <span class="checktext">
+                                    <span class="checktitle">debug</span>
+                                </span>
+                            </label>
+                        </div>
+                    </section>
                 </div>
                 <div class="row buttons">
-                    <button id="builds-create" type="button">Create</button>
+                    <button id="builds-create" type="button" class="build-run-btn">
+                        <svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                            <path d="M12 2a10 10 0 1 0 10 10A10.01 10.01 0 0 0 12 2Zm-2 14.5v-9l7 4.5Z" />
+                        </svg>
+                        <span>Build</span>
+                    </button>
                 </div>
             </div>
         </section>

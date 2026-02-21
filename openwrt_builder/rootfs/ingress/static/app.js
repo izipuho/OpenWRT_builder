@@ -811,11 +811,24 @@ function renderBuildsTable(rows) {
     });
 }
 
-function resolveOutputImages(imagesMode) {
-    const mode = String(imagesMode || "sysupgrade").trim();
-    if (mode === "factory") return ["factory"];
-    if (mode === "both") return ["sysupgrade", "factory"];
-    return ["sysupgrade"];
+function selectedBuildOutputImages() {
+    const allowed = new Set(["sysupgrade", "factory"]);
+    return checkedValues("builds-images")
+        .map((v) => String(v || "").trim())
+        .filter((v, idx, arr) => allowed.has(v) && arr.indexOf(v) === idx);
+}
+
+function wireBuildImagesSelection() {
+    const inputs = Array.from(document.querySelectorAll('input[data-group="builds-images"]'));
+    if (!inputs.length) return;
+    inputs.forEach((input) => {
+        input.addEventListener("change", () => {
+            const checked = inputs.filter((item) => item.checked);
+            if (checked.length) return;
+            const fallback = inputs.find((item) => item !== input) || input;
+            fallback.checked = true;
+        });
+    });
 }
 
 async function downloadBuild(buildId) {
@@ -959,10 +972,9 @@ async function createBuild() {
     const target = el("builds-target").value.trim();
     const subtarget = el("builds-subtarget").value.trim();
     const version = el("builds-version").value.trim();
-    const imagesMode = el("builds-images").value;
     const forceRebuild = el("builds-force").checked;
     const debug = el("builds-debug").checked;
-    const outputImages = resolveOutputImages(imagesMode);
+    const outputImages = selectedBuildOutputImages();
 
     if (!profileId) {
         showBuildsError("Select a profile");
@@ -997,7 +1009,7 @@ async function createBuild() {
                 options: {
                     force_rebuild: forceRebuild,
                     debug,
-                    output_images: outputImages,
+                    output_images: outputImages.length ? outputImages : ["sysupgrade"],
                 },
             },
         }),
@@ -1134,6 +1146,7 @@ function boot() {
 
     el("builds-refresh").addEventListener("click", () => refreshBuilds().catch((e) => showBuildsError(e.message || e)));
     el("builds-create").addEventListener("click", () => createBuild().catch((e) => showBuildsError(e.message || e)));
+    wireBuildImagesSelection();
     el("builds-request-tooltip-copy").addEventListener("click", async (event) => {
         const tooltip = el("builds-request-tooltip");
         const requestJson = String(tooltip.dataset.requestJson || "");
