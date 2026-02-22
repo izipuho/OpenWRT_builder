@@ -47,6 +47,19 @@ docker compose -f docker-compose.standalone.yml up -d --build
 
 Then open `http://localhost:8080`. For production, set `OPENWRT_BUILDER_CORS_ORIGINS` via shell environment or project `.env` to your real UI hostname(s).
 
+## Convert External Package Lists
+
+If you have package lists from another ImageBuilder project (for example `lists/` from a cloned repository), convert them into this project's list format:
+
+```bash
+python3 openwrt_builder/tools/convert_imagebuilder_lists.py \
+  --source-dir /path/to/imagebuilder/lists \
+  --output-dir openwrt_builder/data/lists \
+  --dry-run
+```
+
+When output looks correct, run again without `--dry-run` (and add `--overwrite` if needed).
+
 
 ## Standalone: current implementation summary
 
