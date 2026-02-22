@@ -27,6 +27,7 @@ import json
 import time
 from typing import Any
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote
 from urllib.request import Request as UrlRequest, urlopen
 
 from fastapi import APIRouter, Request
@@ -57,6 +58,8 @@ SYSUPGRADE_OVERVIEW_URL = "https://sysupgrade.openwrt.org/json/v1/overview.json"
 _SYSUPGRADE_OVERVIEW_TTL_SECONDS = 300.0
 _sysupgrade_overview_cache: dict[str, Any] | list[Any] | None = None
 _sysupgrade_overview_cached_at_monotonic = 0.0
+_profiles_cache: dict[tuple[str, str, str], tuple[float, dict[str, Any] | list[Any]]] = {}
+_PROFILES_TTL_SECONDS = 300.0
 
 
 def _fetch_sysupgrade_overview() -> dict[str, Any] | list[Any]:
@@ -335,6 +338,76 @@ def _serialize_version_tree(tree: dict[str, dict[str, set[str]]]) -> dict[str, d
     return out
 
 
+def _fetch_profiles_payload(version: str, target: str, subtarget: str) -> dict[str, Any] | list[Any]:
+    key = (version, target, subtarget)
+    now = time.monotonic()
+    cached = _profiles_cache.get(key)
+    if cached and (now - cached[0]) < _PROFILES_TTL_SECONDS:
+        return cached[1]
+
+    url = (
+        "https://downloads.openwrt.org/releases/"
+        f"{quote(version, safe='')}/targets/{quote(target, safe='')}/"
+        f"{quote(subtarget, safe='')}/profiles.json"
+    )
+    try:
+        req = UrlRequest(
+            url,
+            headers={
+                "Accept": "application/json",
+                "User-Agent": "openwrt-builder/1.0",
+            },
+        )
+        with urlopen(req, timeout=8) as res:
+            payload = json.loads(res.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError) as e:
+        if cached:
+            return cached[1]
+        raise http_502(e)
+
+    if not isinstance(payload, (dict, list)):
+        raise http_502(ValueError("profiles.json returned unexpected payload type"))
+
+    _profiles_cache[key] = (now, payload)
+    return payload
+
+
+def _extract_profile_ids(payload: dict[str, Any] | list[Any]) -> list[str]:
+    profile_ids: list[str] = []
+
+    if isinstance(payload, dict):
+        raw_profiles = payload.get("profiles")
+        if isinstance(raw_profiles, dict):
+            for raw_id in raw_profiles.keys():
+                if isinstance(raw_id, str) and raw_id.strip():
+                    profile_ids.append(raw_id.strip())
+        elif isinstance(raw_profiles, list):
+            for item in raw_profiles:
+                if isinstance(item, str) and item.strip():
+                    profile_ids.append(item.strip())
+                elif isinstance(item, dict):
+                    raw_id = item.get("id") or item.get("name")
+                    if isinstance(raw_id, str) and raw_id.strip():
+                        profile_ids.append(raw_id.strip())
+    elif isinstance(payload, list):
+        for item in payload:
+            if isinstance(item, str) and item.strip():
+                profile_ids.append(item.strip())
+            elif isinstance(item, dict):
+                raw_id = item.get("id") or item.get("name")
+                if isinstance(raw_id, str) and raw_id.strip():
+                    profile_ids.append(raw_id.strip())
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for profile_id in profile_ids:
+        if profile_id in seen:
+            continue
+        seen.add(profile_id)
+        deduped.append(profile_id)
+    return sorted(deduped)
+
+
 # =========================
 # Registry interface
 # =========================
@@ -464,7 +537,7 @@ def get_build_subtargets(version: str, target: str):
 
 @router.get("/build-platforms")
 def get_build_platforms(version: str, target: str, subtarget: str):
-    """Return available platform/profile names for version/target/subtarget."""
+    """Return available device profile IDs for version/target/subtarget."""
     overview = _fetch_sysupgrade_overview()
     raw_targets = _targets_for_latest_version(overview, version)
     if raw_targets is None:
@@ -476,11 +549,14 @@ def get_build_platforms(version: str, target: str, subtarget: str):
     platforms = target_subtargets.get(subtarget)
     if platforms is None:
         raise http_404("subtarget_not_found")
+
+    profiles_payload = _fetch_profiles_payload(version, target, subtarget)
+    profiles = _extract_profile_ids(profiles_payload)
     return {
         "version": version,
         "target": target,
         "subtarget": subtarget,
-        "platforms": sorted(platforms),
+        "platforms": profiles,
     }
 
 
