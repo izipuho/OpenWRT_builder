@@ -1,0 +1,12 @@
+FROM python:3.12-alpine
+
+RUN apk add --no-cache build-base make tar xz zstd perl
+RUN pip3 install --no-cache-dir fastapi uvicorn pydantic python-multipart
+
+COPY rootfs /
+COPY imagebuilder-wrapper /app/imagebuilder-wrapper
+
+RUN chmod +x /usr/local/bin/standalone-entrypoint.sh
+
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/standalone-entrypoint.sh"]

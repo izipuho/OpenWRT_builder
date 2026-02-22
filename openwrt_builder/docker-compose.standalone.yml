@@ -2,7 +2,7 @@ services:
   openwrt-builder:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.standalone
     container_name: openwrt-builder
     ports:
       - "8080:8080"

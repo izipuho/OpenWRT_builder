@@ -31,6 +31,11 @@ Home Assistant add-on that runs OpenWrt ImageBuilder and allows building custom 
 
 MIT
 
+## Build Modes
+
+- Home Assistant add-on mode uses `openwrt_builder/Dockerfile` with Home Assistant base images from `openwrt_builder/build.yaml`.
+- Standalone Docker mode uses `openwrt_builder/Dockerfile.standalone` via `openwrt_builder/docker-compose.standalone.yml`.
+- These paths are intentionally separated so standalone changes do not affect HA add-on compatibility.
 
 
 ## Run in standalone mode
