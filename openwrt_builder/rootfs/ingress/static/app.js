@@ -173,6 +173,23 @@ async function refreshLists() {
     renderListsTable(rows);
 }
 
+function showListsError(err = "") {
+    const msg = String(err || "").trim();
+    el("lists-error").textContent = msg;
+    el("lists-error").classList.toggle("hidden", !msg);
+}
+
+async function importLists() {
+    showListsError("");
+    const payload = await apiJson(`${API}/lists/import`, { method: "POST" });
+    const found = Number(payload?.found) || 0;
+    const created = Number(payload?.created) || 0;
+    const skipped = Number(payload?.skipped) || 0;
+    const errors = Number(payload?.errors) || 0;
+    showListsError(`import: found=${found}, created=${created}, skipped=${skipped}, errors=${errors}`);
+    await refreshLists();
+}
+
 function showListsEditor(html) {
     el("lists-editor").innerHTML = html;
     el("lists-editor").classList.remove("hidden");
@@ -1283,8 +1300,9 @@ function boot() {
     window.addEventListener("resize", hideBuildTooltips);
     window.addEventListener("scroll", hideBuildTooltips, { passive: true });
 
-    el("lists-refresh").addEventListener("click", () => refreshLists().catch(() => { }));
-    el("lists-create").addEventListener("click", () => openListEditor(null).catch(() => { }));
+    el("lists-refresh").addEventListener("click", () => refreshLists().catch((e) => showListsError(e.message || e)));
+    el("lists-create").addEventListener("click", () => openListEditor(null).catch((e) => showListsError(e.message || e)));
+    el("lists-import-run").addEventListener("click", () => importLists().catch((e) => showListsError(e.message || e)));
 
     el("profiles-refresh").addEventListener("click", () => refreshProfiles().catch(() => { }));
     el("profiles-create").addEventListener("click", () => openProfileEditor(null).catch(() => { }));
@@ -1300,7 +1318,7 @@ function boot() {
             refreshBuilds().catch(() => { });
         }, BUILDS_AUTO_REFRESH_MS);
     }
-    refreshLists().catch(() => { });
+    refreshLists().catch((e) => showListsError(e.message || e));
     refreshProfiles().catch(() => { });
     refreshFiles().catch((e) => showFilesError(e.message || e));
 }

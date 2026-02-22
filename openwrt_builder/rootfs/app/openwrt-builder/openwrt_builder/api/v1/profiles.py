@@ -2,8 +2,18 @@
 from fastapi import APIRouter, Request
 
 from openwrt_builder.api.errors import http_400, http_404, http_409
+from openwrt_builder.env import env_path
+from openwrt_builder.service.lists_importer import (
+    build_output_payload,
+    collect_sources,
+    human_name,
+    parse_source,
+    slugify,
+    unique_id,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["profiles", "lists"])
+FILES_DIR = env_path("OPENWRT_BUILDER_FILES_DIR").resolve()
 
 
 @router.get("/health")
@@ -108,6 +118,58 @@ def delete_list(req: Request, list_id: str):
         return reg.delete(list_id)
     except FileNotFoundError:
         raise http_404("list_not_found")
+
+
+@router.post("/lists/import", status_code=200)
+def import_lists(req: Request):
+    """Import list files from OPENWRT_BUILDER_FILES_DIR/lists."""
+    reg = req.app.state.lists_registry
+    abs_source = (FILES_DIR / "lists").resolve()
+    if not abs_source.exists() or not abs_source.is_dir():
+        raise http_404("source_dir_not_found")
+    if FILES_DIR != abs_source and FILES_DIR not in abs_source.parents:
+        raise http_400(ValueError("invalid_path"))
+
+    sources = collect_sources(abs_source)
+    used_ids: set[str] = set()
+    created = 0
+    skipped = 0
+    errors = 0
+
+    for source in sources:
+        rel_stem = source.relative_to(abs_source).with_suffix("").as_posix()
+        list_id = unique_id(slugify(rel_stem), used_ids)
+        exists = False
+
+        try:
+            include, exclude, name_from_source = parse_source(source)
+            name = name_from_source or human_name(source.stem)
+            payload = build_output_payload(name=name, include=include, exclude=exclude)
+            try:
+                reg.get(list_id)
+                exists = True
+            except FileNotFoundError:
+                exists = False
+
+            if exists:
+                skipped += 1
+                continue
+            reg.create(payload, list_id, False)
+            created += 1
+        except Exception as exc:
+            if isinstance(exc, FileExistsError):
+                skipped += 1
+                continue
+            errors += 1
+            continue
+
+    return {
+        "source_subdir": "lists",
+        "found": len(sources),
+        "created": created,
+        "skipped": skipped,
+        "errors": errors,
+    }
 
 # =========================
 # Misc
