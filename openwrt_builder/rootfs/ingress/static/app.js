@@ -486,15 +486,11 @@ function profileEditorHtml(id, model, listOptions, fileOptions) {
     const schemaVersion = Number(model?.schema_version) || 1;
     const name = model?.name || "";
     const normalizedFileOptions = Array.isArray(fileOptions) ? fileOptions : [];
-    const mergedFileOptions = [
-        ...normalizedFileOptions,
-        ...selectedFiles
-            .filter((v) => !normalizedFileOptions.some((o) => o.id === v))
-            .map((v) => ({ id: v, title: v, meta: "missing on disk" })),
-    ];
+    const availableFileIds = new Set(normalizedFileOptions.map((o) => o.id));
+    const selectedExistingFiles = selectedFiles.filter((v) => availableFileIds.has(v));
     const defaultSelectedFiles = !id && selectedFiles.length === 0
-        ? mergedFileOptions.map((o) => o.id)
-        : selectedFiles;
+        ? normalizedFileOptions.map((o) => o.id)
+        : selectedExistingFiles;
 
     return `
     <h2>${id ? "Edit profile" : "Create profile"}</h2>
@@ -513,7 +509,7 @@ function profileEditorHtml(id, model, listOptions, fileOptions) {
         <button type="button" data-checklist-action="select-all" data-group="profile-files">Select all</button>
         <button type="button" data-checklist-action="deselect-all" data-group="profile-files">Deselect all</button>
       </div>
-      ${checklistHtml("profile-files", mergedFileOptions, defaultSelectedFiles, "No files uploaded")}
+      ${checklistHtml("profile-files", normalizedFileOptions, defaultSelectedFiles, "No files uploaded")}
     </div>
     <input id="profile-schema-version" type="hidden" value="${escapeAttr(schemaVersion)}" />
     <div class="row buttons">
