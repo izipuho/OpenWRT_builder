@@ -2,3 +2,4 @@
 TODO
 openwrt_builder/data/*
 openwrt_builder/cache/*
+openwrt_builder/data/builds/*
