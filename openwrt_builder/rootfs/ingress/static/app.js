@@ -1,6 +1,6 @@
-const API = "http://10.8.25.110:8080/api/v1";
+//const API = "http://10.8.25.110:8080/api/v1";
 // Keep paths ingress-relative (no leading slash), so requests stay under HA ingress prefix.
-// const API = "api/v1";
+const API = "api/v1";
 const EXAMPLES_BASE = "examples";
 const BUILDS_AUTO_REFRESH_MS = 2000;
 let buildsAutoRefreshHandle = null;
@@ -840,8 +840,8 @@ function renderBuildsTable(rows) {
                     ></button>
                   </div>
                 `
-        : `<span class="muted">-</span>`
-    }
+                : `<span class="muted">-</span>`
+            }
             </td>
             <td class="actions build-actions">
               <div class="actions-wrap">
