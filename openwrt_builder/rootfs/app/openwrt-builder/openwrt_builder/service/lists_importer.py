@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 PACKAGE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.+-]*$")
-ALLOWED_SUFFIXES = {".txt", ".list", ".lst", ".conf", ".cfg", ".json"}
 
 
 def slugify(value: str) -> str:
@@ -148,14 +147,10 @@ def parse_source(path: Path) -> tuple[list[str], list[str], str | None]:
 
 
 def collect_sources(source_dir: Path) -> list[Path]:
-    """Collect supported source files recursively."""
+    """Collect all regular files recursively."""
     out: list[Path] = []
     for path in sorted(source_dir.rglob("*")):
         if not path.is_file():
-            continue
-        if path.name.startswith("."):
-            continue
-        if path.suffix.lower() not in ALLOWED_SUFFIXES:
             continue
         out.append(path)
     return out
