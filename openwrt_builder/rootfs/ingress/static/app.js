@@ -393,6 +393,20 @@ function checkedValues(group) {
         .map((elx) => elx.value);
 }
 
+function wireChecklistBulkActions(root = document) {
+    root.querySelectorAll("button[data-checklist-action][data-group]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const group = String(btn.getAttribute("data-group") || "").trim();
+            const action = String(btn.getAttribute("data-checklist-action") || "").trim();
+            if (!group) return;
+            const checked = action === "select-all";
+            document.querySelectorAll(`input[data-group="${group}"]`).forEach((input) => {
+                input.checked = checked;
+            });
+        });
+    });
+}
+
 function checklistHtml(group, options, selected, emptyText = "No items available") {
     if (!options.length) return `<div class="muted">${escapeHtml(emptyText)}</div>`;
     const selectedSet = new Set(selected || []);
@@ -493,7 +507,14 @@ function profileEditorHtml(id, model, listOptions, fileOptions) {
     <div class="row"><label>lists</label>${checklistHtml("profile-lists", listOptions, selectedLists, "No lists available")}</div>
     <div class="row"><label>include (one per line)</label><textarea id="profile-include" rows="8">${escapeHtml(includeText)}</textarea></div>
     <div class="row"><label>exclude (one per line)</label><textarea id="profile-exclude" rows="8">${escapeHtml(excludeText)}</textarea></div>
-    <div class="row"><label>files</label>${checklistHtml("profile-files", mergedFileOptions, defaultSelectedFiles, "No files uploaded")}</div>
+    <div class="row">
+      <label>files</label>
+      <div class="row buttons">
+        <button type="button" data-checklist-action="select-all" data-group="profile-files">Select all</button>
+        <button type="button" data-checklist-action="deselect-all" data-group="profile-files">Deselect all</button>
+      </div>
+      ${checklistHtml("profile-files", mergedFileOptions, defaultSelectedFiles, "No files uploaded")}
+    </div>
     <input id="profile-schema-version" type="hidden" value="${escapeAttr(schemaVersion)}" />
     <div class="row buttons">
       <button id="profile-save" type="button">Save</button>
@@ -511,10 +532,12 @@ async function openProfileEditor(id = null) {
         const model = normalizeProfileTemplate(obj);
         showProfilesEditor(profileEditorHtml(id, model, listOptions, fileOptions));
         wireProfileEditor(id);
+        wireChecklistBulkActions(el("profiles-editor"));
     } else {
         const model = await getProfileTemplate();
         showProfilesEditor(profileEditorHtml("", model, listOptions, fileOptions));
         wireProfileEditor(null);
+        wireChecklistBulkActions(el("profiles-editor"));
     }
 }
 
