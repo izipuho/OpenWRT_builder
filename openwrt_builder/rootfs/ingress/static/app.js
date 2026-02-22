@@ -365,7 +365,12 @@ async function getListChoices() {
                 meta: id,
             };
         })
-        .filter(Boolean);
+        .filter(Boolean)
+        .sort((a, b) => {
+            const byTitle = a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+            if (byTitle !== 0) return byTitle;
+            return a.id.localeCompare(b.id, undefined, { sensitivity: "base" });
+        });
 }
 
 async function getFileChoices() {
