@@ -17,8 +17,8 @@ DOWNLOADS_BASE = https://downloads.openwrt.org/releases/${RELEASE}/targets/${TAR
 INSTRUCTION_SET = $(shell curl --silent ${DOWNLOADS_BASE}/profiles.json | jq --raw-output .arch_packages)
 
 CONFIGS = $(wildcard config.mk) $C/config.mk
-DEPS += $(shell [ ! -d ${files} ] || find ${files} -type f,l)
-DEPS += $(shell [ -d $C/files ] && find $C/files -type f,l)
+DEPS += $(shell [ ! -d ${files} ] || find ${files} \( -type f -o -type l \))
+DEPS += $(shell [ -d $C/files ] && find $C/files \( -type f -o -type l \))
 DEPS += ${CONFIGS}
 
 imagebuilder ?= openwrt-imagebuilder-${RELEASE}-${TARGET}-${SUBTARGET}.Linux-x86_64
