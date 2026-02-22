@@ -9,6 +9,6 @@ services:
     env_file:
       - ./.env
     volumes:
-      - ./standalone-data:/data
-      - ./standalone-cache:/cache
+      - ./data:/data
+      - ./cache:/cache
     restart: unless-stopped

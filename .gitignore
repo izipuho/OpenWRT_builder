@@ -1,2 +1,4 @@
 .DS_Store
 TODO
+openwrt_builder/data/*
+openwrt_builder/cache/*
