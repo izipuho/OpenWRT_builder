@@ -299,6 +299,66 @@ button:active {
     white-space: nowrap;
 }
 
+.entity-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 10px;
+}
+
+.entity-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px;
+    background: #fcfcfc;
+    display: grid;
+    gap: 8px;
+}
+
+.entity-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.entity-card-select {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.entity-card-select input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+}
+
+.entity-card-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.entity-card-title {
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.25;
+    word-break: break-word;
+}
+
+.entity-card-meta {
+    font-size: 13px;
+    line-height: 1.25;
+    word-break: break-word;
+}
+
+@media (max-width: 720px) {
+    .entity-cards-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 .state-badge {
     display: inline-flex;
     align-items: center;

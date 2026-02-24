@@ -360,31 +360,31 @@ function renderListsTable(rows) {
     const sortedRows = sortByUpdatedAtDesc(rows);
     const ids = sortedRows.map((r) => r.list_id ?? r.id ?? "");
     syncRowSelection("lists", ids);
-    const html = `
-    <table>
-      <thead>
-        <tr><th></th><th>id</th><th>name</th><th>updated_at</th><th></th></tr>
-      </thead>
-      <tbody>
-        ${sortedRows.map((r) => {
-        const id = r.list_id ?? r.id ?? "";
-        return `
-          <tr>
-            <td class="select-cell">
+    const html = !sortedRows.length
+        ? `<div class="muted">No lists yet</div>`
+        : `
+    <div class="entity-cards-grid">
+      ${sortedRows.map((r) => {
+            const id = r.list_id ?? r.id ?? "";
+            return `
+        <article class="entity-card">
+          <div class="entity-card-head">
+            <label class="entity-card-select">
               <input type="checkbox" data-select-scope="lists" data-id="${escapeAttr(id)}" ${rowSelection.lists.has(String(id)) ? "checked" : ""} />
-            </td>
-            <td>${escapeHtml(id)}</td>
-            <td>${escapeHtml(r.name ?? "")}</td>
-            <td>${renderUpdatedAtCell(r.updated_at)}</td>
-            <td class="actions">
+              <span>Select</span>
+            </label>
+            <div class="entity-card-actions">
               <button type="button" data-act="edit" data-id="${escapeAttr(id)}">Edit</button>
               <button type="button" data-act="del" data-id="${escapeAttr(id)}">Delete</button>
-            </td>
-          </tr>
-        `;
-    }).join("")}
-      </tbody>
-    </table>
+            </div>
+          </div>
+          <div class="entity-card-title">${escapeHtml(r.name ?? "") || "<span class=\"muted\">Unnamed list</span>"}</div>
+          <div class="entity-card-meta"><span class="muted">id</span> ${escapeHtml(id)}</div>
+          <div class="entity-card-meta"><span class="muted">updated</span> ${renderUpdatedAtCell(r.updated_at) || "<span class=\"muted\">-</span>"}</div>
+        </article>
+      `;
+        }).join("")}
+    </div>
   `;
     el("lists-table").innerHTML = html;
     wireTableRowSelection("lists-table", "lists");
@@ -664,31 +664,31 @@ function renderProfilesTable(rows) {
     const sortedRows = sortByUpdatedAtDesc(rows);
     const ids = sortedRows.map((r) => r.profile_id ?? r.id ?? "");
     syncRowSelection("profiles", ids);
-    const html = `
-    <table>
-      <thead>
-        <tr><th></th><th>id</th><th>name</th><th>updated_at</th><th></th></tr>
-      </thead>
-      <tbody>
-        ${sortedRows.map((r) => {
-        const id = r.profile_id ?? r.id ?? "";
-        return `
-            <tr>
-              <td class="select-cell">
-                <input type="checkbox" data-select-scope="profiles" data-id="${escapeAttr(id)}" ${rowSelection.profiles.has(String(id)) ? "checked" : ""} />
-              </td>
-              <td>${escapeHtml(id)}</td>
-              <td>${escapeHtml(r.name ?? "")}</td>
-              <td>${renderUpdatedAtCell(r.updated_at)}</td>
-              <td class="actions">
-                <button type="button" data-act="edit" data-id="${escapeAttr(id)}">Edit</button>
-                <button type="button" data-act="del" data-id="${escapeAttr(id)}">Delete</button>
-              </td>
-            </tr>
-          `;
-    }).join("")}
-      </tbody>
-    </table>
+    const html = !sortedRows.length
+        ? `<div class="muted">No profiles yet</div>`
+        : `
+    <div class="entity-cards-grid">
+      ${sortedRows.map((r) => {
+            const id = r.profile_id ?? r.id ?? "";
+            return `
+        <article class="entity-card">
+          <div class="entity-card-head">
+            <label class="entity-card-select">
+              <input type="checkbox" data-select-scope="profiles" data-id="${escapeAttr(id)}" ${rowSelection.profiles.has(String(id)) ? "checked" : ""} />
+              <span>Select</span>
+            </label>
+            <div class="entity-card-actions">
+              <button type="button" data-act="edit" data-id="${escapeAttr(id)}">Edit</button>
+              <button type="button" data-act="del" data-id="${escapeAttr(id)}">Delete</button>
+            </div>
+          </div>
+          <div class="entity-card-title">${escapeHtml(r.name ?? "") || "<span class=\"muted\">Unnamed profile</span>"}</div>
+          <div class="entity-card-meta"><span class="muted">id</span> ${escapeHtml(id)}</div>
+          <div class="entity-card-meta"><span class="muted">updated</span> ${renderUpdatedAtCell(r.updated_at) || "<span class=\"muted\">-</span>"}</div>
+        </article>
+      `;
+        }).join("")}
+    </div>
   `;
     el("profiles-table").innerHTML = html;
     wireTableRowSelection("profiles-table", "profiles");
