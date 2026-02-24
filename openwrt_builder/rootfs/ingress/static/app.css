@@ -26,6 +26,31 @@ body {
     font-weight: 800;
 }
 
+.api-config {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px 0;
+}
+
+.api-config label {
+    font-size: 13px;
+    color: var(--muted);
+}
+
+#api-backend-address {
+    width: min(520px, 100%);
+}
+
+#api-path {
+    width: 120px;
+}
+
+#api-base-state {
+    margin: 0 0 10px 0;
+}
+
 .tabs {
     display: flex;
     gap: 4px;

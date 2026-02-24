@@ -17,6 +17,7 @@
             <button id="tab-lists" class="tab" type="button" role="tab" aria-controls="view-lists" aria-selected="false" tabindex="-1">Lists</button>
             <button id="tab-profiles" class="tab" type="button" role="tab" aria-controls="view-profiles" aria-selected="false" tabindex="-1">Profiles</button>
             <button id="tab-files" class="tab" type="button" role="tab" aria-controls="view-files" aria-selected="false" tabindex="-1">Files</button>
+            <button id="tab-settings" class="tab" type="button" role="tab" aria-controls="view-settings" aria-selected="false" tabindex="-1">Settings</button>
         </nav>
     </header>
 
@@ -177,6 +178,24 @@
             </div>
             <div id="files-table" class="table"></div>
             <pre id="files-error" class="error hidden"></pre>
+        </section>
+
+        <section id="view-settings" class="view hidden" role="tabpanel" aria-labelledby="tab-settings" aria-hidden="true">
+            <div class="editor">
+                <h2>Settings</h2>
+                <div class="api-config">
+                    <label for="api-backend-address">Backend address</label>
+                    <input id="api-backend-address" type="text" placeholder="http://10.8.25.20:8080 (empty = same origin)" spellcheck="false" />
+                    <label for="api-path">API path</label>
+                    <input id="api-path" type="text" value="api/v1" placeholder="api/v1" spellcheck="false" />
+                    <button id="api-base-apply" type="button">Apply</button>
+                    <button id="api-base-reset" type="button">Reset</button>
+                </div>
+                <div id="api-base-state" class="muted"></div>
+                <div class="muted">
+                    Effective API base is built as <code>{backend}/{api-path}</code>. Examples endpoint uses <code>{backend}/examples</code>.
+                </div>
+            </div>
         </section>
     </main>
 

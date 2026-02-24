@@ -1,7 +1,10 @@
-//const API = "http://10.8.25.110:8080/api/v1";
-// Keep paths ingress-relative (no leading slash), so requests stay under HA ingress prefix.
-const API = "api/v1";
-const EXAMPLES_BASE = "examples";
+const BACKEND_ADDRESS_STORAGE_KEY = "openwrt_builder_backend_address";
+const API_PATH_STORAGE_KEY = "openwrt_builder_api_path";
+const LEGACY_API_BASE_STORAGE_KEY = "openwrt_builder_api_base";
+const DEFAULT_BACKEND_ADDRESS = "";
+const DEFAULT_API_PATH = "api/v1";
+const TAB_NAMES = ["builds", "lists", "profiles", "files", "settings"];
+let API = DEFAULT_API_PATH;
 const BUILDS_AUTO_REFRESH_MS = 2000;
 let buildsAutoRefreshHandle = null;
 const rowSelection = {
@@ -18,8 +21,136 @@ const fileTargetDrafts = new Map();
 
 const el = (id) => document.getElementById(id);
 
+function normalizeBackendAddress(input) {
+    const value = String(input || "").trim();
+    if (!value) return DEFAULT_BACKEND_ADDRESS;
+    return value.replace(/\/+$/, "");
+}
+
+function normalizeApiPath(input) {
+    const value = String(input || "").trim();
+    if (!value) return DEFAULT_API_PATH;
+    return value.replace(/^\/+/, "").replace(/\/+$/, "");
+}
+
+function buildApiBase(address, path) {
+    const safeAddress = normalizeBackendAddress(address);
+    const safePath = normalizeApiPath(path);
+    return safeAddress ? `${safeAddress}/${safePath}` : safePath;
+}
+
+function buildExamplesBase(address) {
+    const safeAddress = normalizeBackendAddress(address);
+    return safeAddress ? `${safeAddress}/examples` : "examples";
+}
+
+function parseLegacyApiBase(input) {
+    const raw = String(input || "").trim().replace(/\/+$/, "");
+    if (!raw) return null;
+
+    let match = raw.match(/^(https?:\/\/[^/]+)\/(.+)$/i);
+    if (match) return { address: normalizeBackendAddress(match[1]), path: normalizeApiPath(match[2]) };
+
+    match = raw.match(/^\/?(.+)$/i);
+    if (match) return { address: DEFAULT_BACKEND_ADDRESS, path: normalizeApiPath(match[1]) };
+
+    return null;
+}
+
+function loadApiConfigFromStorage() {
+    try {
+        const addressStored = window.localStorage.getItem(BACKEND_ADDRESS_STORAGE_KEY);
+        const pathStored = window.localStorage.getItem(API_PATH_STORAGE_KEY);
+        if (addressStored !== null || pathStored !== null) {
+            return {
+                address: normalizeBackendAddress(addressStored),
+                path: normalizeApiPath(pathStored),
+            };
+        }
+
+        const legacy = window.localStorage.getItem(LEGACY_API_BASE_STORAGE_KEY);
+        const parsed = parseLegacyApiBase(legacy);
+        if (parsed) return parsed;
+        return { address: DEFAULT_BACKEND_ADDRESS, path: DEFAULT_API_PATH };
+    } catch (_) {
+        return { address: DEFAULT_BACKEND_ADDRESS, path: DEFAULT_API_PATH };
+    }
+}
+
+function saveApiConfigToStorage(address, path) {
+    try {
+        window.localStorage.setItem(BACKEND_ADDRESS_STORAGE_KEY, normalizeBackendAddress(address));
+        window.localStorage.setItem(API_PATH_STORAGE_KEY, normalizeApiPath(path));
+    } catch (_) {
+        // Ignore storage errors (private mode, quota, blocked storage).
+    }
+}
+
+function refreshAllViews() {
+    refreshBuilds().catch((e) => showBuildsError(e.message || e));
+    refreshLists().catch((e) => showListsError(e.message || e));
+    refreshProfiles().catch((e) => showProfilesError(e.message || e));
+    refreshFiles().catch((e) => showFilesError(e.message || e));
+}
+
+function renderApiBaseState() {
+    const addressInput = el("api-backend-address");
+    const pathInput = el("api-path");
+    const state = el("api-base-state");
+    if (!addressInput || !pathInput || !state) return;
+
+    const address = normalizeBackendAddress(addressInput.value);
+    const path = normalizeApiPath(pathInput.value);
+    const mode = address ? "remote backend server" : "same-origin backend";
+    const apiBase = buildApiBase(address, path);
+    const examplesBase = buildExamplesBase(address);
+    state.textContent = `Active API: ${apiBase} | examples: ${examplesBase} (${mode})`;
+}
+
+function applyApiConfig(nextAddressRaw, nextPathRaw) {
+    const address = normalizeBackendAddress(nextAddressRaw);
+    const path = normalizeApiPath(nextPathRaw);
+    API = buildApiBase(address, path);
+    saveApiConfigToStorage(address, path);
+    templateCache.list = null;
+    templateCache.profile = null;
+
+    const addressInput = el("api-backend-address");
+    const pathInput = el("api-path");
+    if (addressInput) addressInput.value = address;
+    if (pathInput) pathInput.value = path;
+
+    renderApiBaseState();
+    refreshAllViews();
+}
+
+function wireApiBaseControls() {
+    const addressInput = el("api-backend-address");
+    const pathInput = el("api-path");
+    const applyBtn = el("api-base-apply");
+    const resetBtn = el("api-base-reset");
+    if (!addressInput || !pathInput || !applyBtn || !resetBtn) return;
+
+    const submit = () => applyApiConfig(addressInput.value, pathInput.value);
+    applyBtn.addEventListener("click", submit);
+    resetBtn.addEventListener("click", () => applyApiConfig(DEFAULT_BACKEND_ADDRESS, DEFAULT_API_PATH));
+    addressInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            submit();
+        }
+    });
+    pathInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            submit();
+        }
+    });
+    renderApiBaseState();
+}
+
 function setTab(tab) {
-    ["builds", "lists", "profiles", "files"].forEach((name) => {
+    TAB_NAMES.forEach((name) => {
         const active = tab === name;
         const tabEl = el(`tab-${name}`);
         const viewEl = el(`view-${name}`);
@@ -32,19 +163,18 @@ function setTab(tab) {
 }
 
 function wireTabKeyboardNavigation() {
-    const tabNames = ["builds", "lists", "profiles", "files"];
-    tabNames.forEach((name, idx) => {
+    TAB_NAMES.forEach((name, idx) => {
         const tabEl = el(`tab-${name}`);
         tabEl.addEventListener("keydown", (event) => {
             let nextIdx = idx;
-            if (event.key === "ArrowRight") nextIdx = (idx + 1) % tabNames.length;
-            else if (event.key === "ArrowLeft") nextIdx = (idx - 1 + tabNames.length) % tabNames.length;
+            if (event.key === "ArrowRight") nextIdx = (idx + 1) % TAB_NAMES.length;
+            else if (event.key === "ArrowLeft") nextIdx = (idx - 1 + TAB_NAMES.length) % TAB_NAMES.length;
             else if (event.key === "Home") nextIdx = 0;
-            else if (event.key === "End") nextIdx = tabNames.length - 1;
+            else if (event.key === "End") nextIdx = TAB_NAMES.length - 1;
             else return;
 
             event.preventDefault();
-            const nextName = tabNames[nextIdx];
+            const nextName = TAB_NAMES[nextIdx];
             setTab(nextName);
             el(`tab-${nextName}`).focus();
         });
@@ -89,7 +219,9 @@ async function getTemplate({ cacheKey, examplePath, normalize, fallback }) {
     if (templateCache[cacheKey]) return templateCache[cacheKey];
     try {
         const rel = String(examplePath || "").replace(/^\/+/, "");
-        const res = await fetch(`${EXAMPLES_BASE}/${rel}`);
+        const addressInput = el("api-backend-address");
+        const examplesBase = buildExamplesBase(addressInput?.value || "");
+        const res = await fetch(`${examplesBase}/${rel}`);
         if (!res.ok) throw new Error(`template_http_${res.status}`);
         templateCache[cacheKey] = normalize(await res.json());
     } catch (_) {
@@ -1546,10 +1678,19 @@ function escapeAttr(s) {
 }
 
 function boot() {
+    const config = loadApiConfigFromStorage();
+    API = buildApiBase(config.address, config.path);
+    const addressInput = el("api-backend-address");
+    const pathInput = el("api-path");
+    if (addressInput) addressInput.value = config.address;
+    if (pathInput) pathInput.value = config.path;
+    wireApiBaseControls();
+
     el("tab-builds").addEventListener("click", () => setTab("builds"));
     el("tab-lists").addEventListener("click", () => setTab("lists"));
     el("tab-profiles").addEventListener("click", () => setTab("profiles"));
     el("tab-files").addEventListener("click", () => setTab("files"));
+    el("tab-settings").addEventListener("click", () => setTab("settings"));
     wireTabKeyboardNavigation();
 
     el("builds-refresh").addEventListener("click", () => refreshBuilds().catch((e) => showBuildsError(e.message || e)));
@@ -1626,16 +1767,13 @@ function boot() {
 
     setTab("builds");
     hideBuildTooltips();
-    refreshBuilds().catch((e) => showBuildsError(e.message || e));
     if (buildsAutoRefreshHandle === null) {
         buildsAutoRefreshHandle = window.setInterval(() => {
             if (el("view-builds").classList.contains("hidden")) return;
             refreshBuilds().catch(() => { });
         }, BUILDS_AUTO_REFRESH_MS);
     }
-    refreshLists().catch((e) => showListsError(e.message || e));
-    refreshProfiles().catch((e) => showProfilesError(e.message || e));
-    refreshFiles().catch((e) => showFilesError(e.message || e));
+    refreshAllViews();
 }
 
 boot();
