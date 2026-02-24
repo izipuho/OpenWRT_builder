@@ -16,6 +16,14 @@ const entitySort = {
     lists: { field: "updated", direction: "desc" },
     profiles: { field: "updated", direction: "desc" },
 };
+const entitySearch = {
+    lists: "",
+    profiles: "",
+};
+const entityRowsCache = {
+    lists: [],
+    profiles: [],
+};
 
 const templateCache = {
     list: null,
@@ -361,6 +369,16 @@ function setEntitySort(scope, field) {
     renderEntitySortButtons(scope);
 }
 
+function filterEntityRows(scope, rows) {
+    const query = String(entitySearch[scope] || "").trim().toLowerCase();
+    if (!query) return [...(rows || [])];
+    return [...(rows || [])].filter((row) => {
+        const id = entityRowId(scope, row).toLowerCase();
+        const name = String(row?.name || "").trim().toLowerCase();
+        return id.includes(query) || name.includes(query);
+    });
+}
+
 function syncRowSelection(scope, ids) {
     if (!rowSelection[scope]) return;
     const currentIds = new Set((ids || []).map((id) => String(id || "").trim()).filter(Boolean));
@@ -437,14 +455,16 @@ async function deleteSelectedItems({
 }
 
 function renderListsTable(rows) {
-    const sortedRows = sortEntityRows("lists", rows);
-    const ids = sortedRows.map((r) => r.list_id ?? r.id ?? "");
+    if (Array.isArray(rows)) entityRowsCache.lists = rows;
+    const sortedRows = sortEntityRows("lists", entityRowsCache.lists);
+    const visibleRows = filterEntityRows("lists", sortedRows);
+    const ids = visibleRows.map((r) => r.list_id ?? r.id ?? "");
     syncRowSelection("lists", ids);
-    const html = !sortedRows.length
-        ? `<div class="muted">No lists yet</div>`
+    const html = !visibleRows.length
+        ? `<div class="muted">${sortedRows.length ? "No matches" : "No lists yet"}</div>`
         : `
     <div class="entity-cards-grid">
-      ${sortedRows.map((r) => {
+      ${visibleRows.map((r) => {
             const id = r.list_id ?? r.id ?? "";
             return `
         <article class="entity-card" data-select-scope="lists" data-id="${escapeAttr(id)}">
@@ -740,14 +760,16 @@ function checklistHtml(group, options, selected, emptyText = "No items available
 }
 
 function renderProfilesTable(rows) {
-    const sortedRows = sortEntityRows("profiles", rows);
-    const ids = sortedRows.map((r) => r.profile_id ?? r.id ?? "");
+    if (Array.isArray(rows)) entityRowsCache.profiles = rows;
+    const sortedRows = sortEntityRows("profiles", entityRowsCache.profiles);
+    const visibleRows = filterEntityRows("profiles", sortedRows);
+    const ids = visibleRows.map((r) => r.profile_id ?? r.id ?? "");
     syncRowSelection("profiles", ids);
-    const html = !sortedRows.length
-        ? `<div class="muted">No profiles yet</div>`
+    const html = !visibleRows.length
+        ? `<div class="muted">${sortedRows.length ? "No matches" : "No profiles yet"}</div>`
         : `
     <div class="entity-cards-grid">
-      ${sortedRows.map((r) => {
+      ${visibleRows.map((r) => {
             const id = r.profile_id ?? r.id ?? "";
             return `
         <article class="entity-card" data-select-scope="profiles" data-id="${escapeAttr(id)}">
@@ -1838,6 +1860,10 @@ function boot() {
         setEntitySort("lists", "updated");
         refreshLists().catch((e) => showListsError(e.message || e));
     });
+    el("lists-search").addEventListener("input", (event) => {
+        entitySearch.lists = String(event.target?.value || "");
+        renderListsTable();
+    });
     el("lists-import-run").addEventListener("click", () => importLists().catch((e) => showListsError(e.message || e)));
     el("lists-select-all").addEventListener("click", () => setVisibleRowSelection("lists", true));
     el("lists-deselect-all").addEventListener("click", () => setVisibleRowSelection("lists", false));
@@ -1852,6 +1878,10 @@ function boot() {
     el("profiles-sort-updated").addEventListener("click", () => {
         setEntitySort("profiles", "updated");
         refreshProfiles().catch((e) => showProfilesError(e.message || e));
+    });
+    el("profiles-search").addEventListener("input", (event) => {
+        entitySearch.profiles = String(event.target?.value || "");
+        renderProfilesTable();
     });
     el("profiles-select-all").addEventListener("click", () => setVisibleRowSelection("profiles", true));
     el("profiles-deselect-all").addEventListener("click", () => setVisibleRowSelection("profiles", false));
