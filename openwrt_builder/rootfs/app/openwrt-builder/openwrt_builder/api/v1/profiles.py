@@ -13,7 +13,7 @@ from openwrt_builder.service.lists_importer import (
 )
 
 router = APIRouter(prefix="/api/v1", tags=["profiles", "lists"])
-FILES_DIR = env_path("OPENWRT_BUILDER_FILES_DIR").resolve()
+LISTS_DIR = env_path("OPENWRT_BUILDER_LISTS_DIR").resolve()
 
 
 @router.get("/health")
@@ -122,12 +122,12 @@ def delete_list(req: Request, list_id: str):
 
 @router.post("/lists/import", status_code=200)
 def import_lists(req: Request):
-    """Import list files from OPENWRT_BUILDER_FILES_DIR/lists."""
+    """Import list files from OPENWRT_BUILDER_LISTS_DIR/lists."""
     reg = req.app.state.lists_registry
-    abs_source = (FILES_DIR / "lists").resolve()
+    abs_source = (LISTS_DIR / "raw").resolve()
     if not abs_source.exists() or not abs_source.is_dir():
         raise http_404("source_dir_not_found")
-    if FILES_DIR != abs_source and FILES_DIR not in abs_source.parents:
+    if LISTS_DIR != abs_source and LISTS_DIR not in abs_source.parents:
         raise http_400(ValueError("invalid_path"))
 
     sources = collect_sources(abs_source)
