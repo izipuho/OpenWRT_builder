@@ -12,6 +12,10 @@ const rowSelection = {
     profiles: new Set(),
     builds: new Set(),
 };
+const entitySort = {
+    lists: { field: "updated", direction: "desc" },
+    profiles: { field: "updated", direction: "desc" },
+};
 
 const templateCache = {
     list: null,
@@ -294,6 +298,69 @@ function sortByUpdatedAtDesc(rows) {
     });
 }
 
+function entityRowId(scope, row) {
+    if (scope === "lists") return String(row?.list_id ?? row?.id ?? "").trim();
+    if (scope === "profiles") return String(row?.profile_id ?? row?.id ?? "").trim();
+    return String(row?.id ?? "").trim();
+}
+
+function sortEntityRows(scope, rows) {
+    const state = entitySort[scope] || { field: "updated", direction: "desc" };
+    const dir = state.direction === "asc" ? 1 : -1;
+    return [...(rows || [])].sort((a, b) => {
+        if (state.field === "name") {
+            const aName = String(a?.name || "").trim();
+            const bName = String(b?.name || "").trim();
+            const byName = aName.localeCompare(bName, undefined, { sensitivity: "base" }) * dir;
+            if (byName !== 0) return byName;
+            return entityRowId(scope, a).localeCompare(entityRowId(scope, b), undefined, { sensitivity: "base" }) * dir;
+        }
+
+        const aTs = timestampToMs(a?.updated_at);
+        const bTs = timestampToMs(b?.updated_at);
+        if (!Number.isNaN(aTs) && !Number.isNaN(bTs)) return (aTs - bTs) * dir;
+        if (!Number.isNaN(aTs)) return -1 * dir;
+        if (!Number.isNaN(bTs)) return 1 * dir;
+        const aRaw = String(a?.updated_at || "");
+        const bRaw = String(b?.updated_at || "");
+        const byUpdatedRaw = aRaw.localeCompare(bRaw, undefined, { sensitivity: "base" }) * dir;
+        if (byUpdatedRaw !== 0) return byUpdatedRaw;
+        return entityRowId(scope, a).localeCompare(entityRowId(scope, b), undefined, { sensitivity: "base" }) * dir;
+    });
+}
+
+function renderEntitySortButtons(scope) {
+    const state = entitySort[scope];
+    if (!state) return;
+    const nameBtn = el(`${scope}-sort-name`);
+    const updatedBtn = el(`${scope}-sort-updated`);
+    if (!nameBtn || !updatedBtn) return;
+
+    const nameActive = state.field === "name";
+    const updatedActive = state.field === "updated";
+    const dirLabel = state.direction === "asc" ? "ascending" : "descending";
+    nameBtn.setAttribute("title", `Sort by name${nameActive ? ` (${dirLabel})` : ""}`);
+    nameBtn.setAttribute("aria-label", `Sort by name${nameActive ? ` (${dirLabel})` : ""}`);
+    updatedBtn.setAttribute("title", `Sort by updated${updatedActive ? ` (${dirLabel})` : ""}`);
+    updatedBtn.setAttribute("aria-label", `Sort by updated${updatedActive ? ` (${dirLabel})` : ""}`);
+    nameBtn.setAttribute("data-dir", nameActive ? state.direction : "");
+    updatedBtn.setAttribute("data-dir", updatedActive ? state.direction : "");
+    nameBtn.classList.toggle("active", nameActive);
+    updatedBtn.classList.toggle("active", updatedActive);
+}
+
+function setEntitySort(scope, field) {
+    const state = entitySort[scope];
+    if (!state) return;
+    if (state.field === field) {
+        state.direction = state.direction === "asc" ? "desc" : "asc";
+    } else {
+        state.field = field;
+        state.direction = field === "name" ? "asc" : "desc";
+    }
+    renderEntitySortButtons(scope);
+}
+
 function syncRowSelection(scope, ids) {
     if (!rowSelection[scope]) return;
     const currentIds = new Set((ids || []).map((id) => String(id || "").trim()).filter(Boolean));
@@ -370,7 +437,7 @@ async function deleteSelectedItems({
 }
 
 function renderListsTable(rows) {
-    const sortedRows = sortByUpdatedAtDesc(rows);
+    const sortedRows = sortEntityRows("lists", rows);
     const ids = sortedRows.map((r) => r.list_id ?? r.id ?? "");
     syncRowSelection("lists", ids);
     const html = !sortedRows.length
@@ -399,6 +466,7 @@ function renderListsTable(rows) {
     el("lists-table").innerHTML = html;
     wireTableRowSelection("lists-table", "lists");
     wireCardRowToggle("lists-table", "lists");
+    renderEntitySortButtons("lists");
 
     el("lists-table").querySelectorAll("button").forEach((b) => {
         b.addEventListener("click", async () => {
@@ -672,7 +740,7 @@ function checklistHtml(group, options, selected, emptyText = "No items available
 }
 
 function renderProfilesTable(rows) {
-    const sortedRows = sortByUpdatedAtDesc(rows);
+    const sortedRows = sortEntityRows("profiles", rows);
     const ids = sortedRows.map((r) => r.profile_id ?? r.id ?? "");
     syncRowSelection("profiles", ids);
     const html = !sortedRows.length
@@ -701,6 +769,7 @@ function renderProfilesTable(rows) {
     el("profiles-table").innerHTML = html;
     wireTableRowSelection("profiles-table", "profiles");
     wireCardRowToggle("profiles-table", "profiles");
+    renderEntitySortButtons("profiles");
 
     el("profiles-table").querySelectorAll("button").forEach((b) => {
         b.addEventListener("click", async () => {
@@ -1761,6 +1830,14 @@ function boot() {
 
     el("lists-refresh").addEventListener("click", () => refreshLists().catch((e) => showListsError(e.message || e)));
     el("lists-create").addEventListener("click", () => openListEditor(null).catch((e) => showListsError(e.message || e)));
+    el("lists-sort-name").addEventListener("click", () => {
+        setEntitySort("lists", "name");
+        refreshLists().catch((e) => showListsError(e.message || e));
+    });
+    el("lists-sort-updated").addEventListener("click", () => {
+        setEntitySort("lists", "updated");
+        refreshLists().catch((e) => showListsError(e.message || e));
+    });
     el("lists-import-run").addEventListener("click", () => importLists().catch((e) => showListsError(e.message || e)));
     el("lists-select-all").addEventListener("click", () => setVisibleRowSelection("lists", true));
     el("lists-deselect-all").addEventListener("click", () => setVisibleRowSelection("lists", false));
@@ -1768,6 +1845,14 @@ function boot() {
 
     el("profiles-refresh").addEventListener("click", () => refreshProfiles().catch((e) => showProfilesError(e.message || e)));
     el("profiles-create").addEventListener("click", () => openProfileEditor(null).catch((e) => showProfilesError(e.message || e)));
+    el("profiles-sort-name").addEventListener("click", () => {
+        setEntitySort("profiles", "name");
+        refreshProfiles().catch((e) => showProfilesError(e.message || e));
+    });
+    el("profiles-sort-updated").addEventListener("click", () => {
+        setEntitySort("profiles", "updated");
+        refreshProfiles().catch((e) => showProfilesError(e.message || e));
+    });
     el("profiles-select-all").addEventListener("click", () => setVisibleRowSelection("profiles", true));
     el("profiles-deselect-all").addEventListener("click", () => setVisibleRowSelection("profiles", false));
     el("profiles-delete-selected").addEventListener("click", () => deleteSelectedProfiles().catch((e) => showProfilesError(e.message || e)));
