@@ -370,10 +370,11 @@ class ImageBuilderExecutor:
             if not isinstance(source_raw, str):
                 continue
             target_raw = row.get("target_path")
-            target_value = source_raw if not isinstance(target_raw, str) else target_raw
+            if not isinstance(target_raw, str):
+                continue
             try:
                 source_path = self._safe_file_rel(source_raw)
-                target_path = self._safe_file_rel(target_value)
+                target_path = "." if target_raw.strip() == "." else self._safe_file_rel(target_raw)
             except ValueError:
                 continue
             if file_id:
@@ -393,9 +394,11 @@ class ImageBuilderExecutor:
                 raise ValueError("invalid_profile_file_path")
             pair = descriptors.get(file_ref)
             if pair is None:
-                # Backward compatibility: old profiles store source path directly.
-                rel = self._safe_file_rel(file_ref)
-                pair = (rel, rel)
+                raise FileNotFoundError(f"selected_file_not_found:{file_ref}")
+            src_rel, target_dir = pair
+            src_name = Path(src_rel).name
+            dst_rel = src_name if target_dir == "." else f"{target_dir}/{src_name}"
+            pair = (src_rel, self._safe_file_rel(dst_rel))
             if pair in seen:
                 continue
             seen.add(pair)

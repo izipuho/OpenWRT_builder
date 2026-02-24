@@ -15,6 +15,7 @@ from openwrt_builder.service.models import (
     FileDescriptorsIndexModel,
     FileRowModel,
     validate_file_id,
+    validate_rel_dir,
     validate_rel_path,
 )
 
@@ -22,6 +23,11 @@ from openwrt_builder.service.models import (
 def _normalize_rel_path(path: str) -> str:
     """Return a normalized relative path or raise ``ValueError``."""
     return validate_rel_path(path)
+
+
+def _normalize_rel_dir(path: str) -> str:
+    """Return a normalized relative directory path or raise ``ValueError``."""
+    return validate_rel_dir(path)
 
 
 def _mtime_utc(path: Path) -> str:
@@ -111,7 +117,11 @@ class FilesRegistry:
                 continue
             file_id = _make_file_id(source, used_ids)
             used_ids.add(file_id)
-            by_source[source] = {"id": file_id, "source_path": source, "target_path": source}
+            by_source[source] = {
+                "id": file_id,
+                "source_path": source,
+                "target_path": _normalize_rel_dir(Path(source).parent.as_posix()),
+            }
             changed = True
 
         rows = [by_source[source] for source in existing_sources]
@@ -139,7 +149,8 @@ class FilesRegistry:
     def upload(self, file: Any, target_path: str | None = None) -> dict:
         """Store one uploaded file and return its descriptor row."""
         source = _normalize_rel_path(file.filename or "")
-        target = _normalize_rel_path(target_path if (target_path or "").strip() else source)
+        default_dir = Path(source).parent.as_posix()
+        target = _normalize_rel_dir(target_path if (target_path or "").strip() else default_dir)
 
         abs_path = (self._files_dir / source).resolve()
         if self._files_dir != abs_path and self._files_dir not in abs_path.parents:
@@ -162,7 +173,7 @@ class FilesRegistry:
     def update_meta(self, file_id: str, target_path: str) -> dict:
         """Update ``target_path`` for one descriptor by ID."""
         normalized_id = validate_file_id(file_id)
-        target = _normalize_rel_path(target_path)
+        target = _normalize_rel_dir(target_path)
 
         rows = self._sync()
         for row in rows:

@@ -577,13 +577,7 @@ function profileEditorHtml(id, model, listOptions, fileOptions) {
     const name = model?.name || "";
     const normalizedFileOptions = Array.isArray(fileOptions) ? fileOptions : [];
     const availableFileIds = new Set(normalizedFileOptions.map((o) => o.id));
-    const sourcePathToId = new Map(
-        normalizedFileOptions.map((o) => [String(o.sourcePath || ""), o.id])
-    );
-    const normalizedSelectedFiles = selectedFiles
-        .map((v) => sourcePathToId.get(String(v || "")) || String(v || ""))
-        .filter(Boolean);
-    const selectedExistingFiles = normalizedSelectedFiles.filter((v) => availableFileIds.has(v));
+    const selectedExistingFiles = selectedFiles.filter((v) => availableFileIds.has(v));
     const defaultSelectedFiles = !id && selectedFiles.length === 0
         ? normalizedFileOptions.map((o) => o.id)
         : selectedExistingFiles;
@@ -1308,12 +1302,11 @@ function renderFilesTable(rows) {
     const html = `
     <table>
       <thead>
-        <tr><th>id</th><th>source_path</th><th>target_path</th><th>size</th><th>updated_at</th><th></th></tr>
+        <tr><th>source_path</th><th>target_path</th><th>size</th><th>updated_at</th><th></th></tr>
       </thead>
       <tbody>
         ${sortedRows.map((r) => `
           <tr>
-            <td>${escapeHtml(r.id ?? "")}</td>
             <td>${escapeHtml(r.source_path ?? r.path ?? "")}</td>
             <td>
               <div class="file-target-edit">
@@ -1326,7 +1319,7 @@ function renderFilesTable(rows) {
                 />
                 <div class="file-target-actions">
                   <button type="button" data-act="save-target" data-id="${escapeAttr(r.id ?? "")}">Save</button>
-                  <button type="button" data-act="reset-target" data-source="${escapeAttr(r.source_path ?? r.path ?? "")}" data-id="${escapeAttr(r.id ?? "")}">Reset</button>
+                  <button type="button" data-act="reset-target" data-source="${escapeAttr(sourceDir(r.source_path ?? r.path ?? ""))}" data-id="${escapeAttr(r.id ?? "")}">Reset</button>
                 </div>
               </div>
             </td>
@@ -1396,14 +1389,12 @@ async function uploadFiles() {
         const fd = new FormData();
         fd.append("file", file, file.name);
         if (targetPath) {
-            const baseDir = targetPath.replace(/\/+$/, "");
-            const fileName = String(file?.name || "").split("/").pop().split("\\").pop();
-            if (!baseDir || !fileName) {
-                showFilesError("invalid target_path or filename");
+            const baseDir = normalizeDirPath(targetPath);
+            if (!baseDir) {
+                showFilesError("invalid target_path directory");
                 return;
             }
-            const effectiveTarget = `${baseDir}/${fileName}`;
-            fd.append("target_path", effectiveTarget);
+            fd.append("target_path", baseDir);
         }
         await apiJson(`${API}/file`, { method: "POST", body: fd });
     }
@@ -1421,9 +1412,9 @@ async function deleteFile(path) {
 
 async function updateFileTarget(fileId, nextTarget) {
     showFilesError("");
-    const normalized = String(nextTarget || "").trim();
+    const normalized = normalizeDirPath(nextTarget);
     if (!normalized) {
-        showFilesError("target_path is required");
+        showFilesError("target_path directory is required");
         return;
     }
     await apiJson(`${API}/file-meta/${encodeURIComponent(fileId)}`, {
@@ -1431,6 +1422,27 @@ async function updateFileTarget(fileId, nextTarget) {
         body: JSON.stringify({ target_path: normalized }),
     });
     await refreshFiles();
+}
+
+function sourceDir(path) {
+    const value = String(path || "").trim().replace(/\\/g, "/");
+    if (!value) return ".";
+    const idx = value.lastIndexOf("/");
+    if (idx < 0) return ".";
+    const dir = value.slice(0, idx).replace(/\/+$/, "");
+    return dir || ".";
+}
+
+function normalizeDirPath(path) {
+    const value = String(path || "").trim().replace(/\\/g, "/");
+    if (!value) return "";
+    if (value === ".") return ".";
+    if (value.startsWith("/")) return "";
+    const dir = value.replace(/\/+$/, "");
+    if (!dir) return "";
+    const parts = dir.split("/");
+    if (parts.some((part) => part === "" || part === "." || part === "..")) return "";
+    return dir;
 }
 
 async function deleteSelectedLists() {

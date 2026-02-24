@@ -24,6 +24,22 @@ def validate_rel_path(value: str) -> str:
     return "/".join(parts)
 
 
+def validate_rel_dir(value: str) -> str:
+    """Validate and normalize a relative directory path.
+
+    ``.`` is allowed and means "root directory".
+    """
+    raw = str(value or "").strip().replace("\\", "/")
+    if not raw:
+        raise ValueError("invalid_path")
+    if raw == ".":
+        return "."
+    parts = raw.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        raise ValueError("invalid_path")
+    return "/".join(parts)
+
+
 def validate_file_id(value: str) -> str:
     """Validate file descriptor identifier format."""
     file_id = str(value or "").strip()
@@ -159,10 +175,15 @@ class FileDescriptorModel(StrictModel):
     def _validate_id(cls, value: str) -> str:
         return validate_file_id(value)
 
-    @field_validator("source_path", "target_path")
+    @field_validator("source_path")
     @classmethod
-    def _validate_paths(cls, value: str) -> str:
+    def _validate_source_path(cls, value: str) -> str:
         return validate_rel_path(value)
+
+    @field_validator("target_path")
+    @classmethod
+    def _validate_target_dir(cls, value: str) -> str:
+        return validate_rel_dir(value)
 
 
 class FileDescriptorsIndexModel(StrictModel):
@@ -186,7 +207,12 @@ class FileRowModel(StrictModel):
     def _validate_id(cls, value: str) -> str:
         return validate_file_id(value)
 
-    @field_validator("source_path", "target_path")
+    @field_validator("source_path")
     @classmethod
-    def _validate_paths(cls, value: str) -> str:
+    def _validate_source_path(cls, value: str) -> str:
         return validate_rel_path(value)
+
+    @field_validator("target_path")
+    @classmethod
+    def _validate_target_dir(cls, value: str) -> str:
+        return validate_rel_dir(value)

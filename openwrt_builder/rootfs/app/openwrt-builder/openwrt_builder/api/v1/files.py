@@ -28,7 +28,7 @@ def list_files(req: Request):
 
 @router.post("/file", status_code=201, response_model=FileOut)
 def upload_file(req: Request, file: UploadFile = File(...), target_path: str | None = Form(default=None)):
-    """Upload one file and optionally set rootfs ``target_path``."""
+    """Upload one file and optionally set rootfs destination directory."""
     _ = req
     try:
         return FILES_REGISTRY.upload(file=file, target_path=target_path)
@@ -38,7 +38,7 @@ def upload_file(req: Request, file: UploadFile = File(...), target_path: str | N
 
 @router.put("/file-meta/{file_id}", status_code=200, response_model=FileOut)
 def update_file_meta(req: Request, file_id: str, body: FileMetaUpdateIn):
-    """Update descriptor metadata for a file by descriptor ID."""
+    """Update destination directory metadata for a file by descriptor ID."""
     _ = req
     try:
         return FILES_REGISTRY.update_meta(file_id=file_id, target_path=body.target_path)

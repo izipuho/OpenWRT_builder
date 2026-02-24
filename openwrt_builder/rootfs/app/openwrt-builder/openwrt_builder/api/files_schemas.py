@@ -5,7 +5,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
-from openwrt_builder.service.models import validate_file_id, validate_rel_path
+from openwrt_builder.service.models import validate_file_id, validate_rel_dir, validate_rel_path
 
 
 class FileOut(BaseModel):
@@ -22,21 +22,26 @@ class FileOut(BaseModel):
     def _validate_id(cls, value: str) -> str:
         return validate_file_id(value)
 
-    @field_validator("source_path", "target_path")
+    @field_validator("source_path")
     @classmethod
-    def _validate_paths(cls, value: str) -> str:
+    def _validate_source_path(cls, value: str) -> str:
         return validate_rel_path(value)
+
+    @field_validator("target_path")
+    @classmethod
+    def _validate_target_dir(cls, value: str) -> str:
+        return validate_rel_dir(value)
 
 
 class FileMetaUpdateIn(BaseModel):
-    """Payload for metadata updates."""
+    """Payload for metadata updates (destination directory only)."""
 
     target_path: str
 
     @field_validator("target_path")
     @classmethod
     def _validate_target_path(cls, value: str) -> str:
-        return validate_rel_path(value)
+        return validate_rel_dir(value)
 
 
 class FileDeleteOut(BaseModel):
