@@ -74,15 +74,11 @@ files: ${FILES}
 $C/.images-built: ${BUILDDIR}/${imagebuilder} ${FILES} ${DEPS}
 	mkdir -p ${BUILDDIR}/${imagebuilder}/tmp
 	mkdir -p ${BUILDDIR}/${imagebuilder}/staging_dir/host/etc/ssl
-	[ -f ${BUILDDIR}/${imagebuilder}/staging_dir/host/etc/ssl/openssl.cnf ] || \
-		( [ -f /etc/ssl/openssl.cnf ] && cp /etc/ssl/openssl.cnf ${BUILDDIR}/${imagebuilder}/staging_dir/host/etc/ssl/openssl.cnf || \
-		  printf '%s\n' 'openssl_conf = openssl_init' '[openssl_init]' > ${BUILDDIR}/${imagebuilder}/staging_dir/host/etc/ssl/openssl.cnf )
+	printf '%s\n' 'openssl_conf = openssl_init' '[openssl_init]' > ${BUILDDIR}/${imagebuilder}/staging_dir/host/etc/ssl/openssl.cnf
 	@if mkdir -p /builder/shared-workdir/build/staging_dir/host/etc/ssl 2>/dev/null; then \
-		[ -f /builder/shared-workdir/build/staging_dir/host/etc/ssl/openssl.cnf ] || \
-			( [ -f /etc/ssl/openssl.cnf ] && cp /etc/ssl/openssl.cnf /builder/shared-workdir/build/staging_dir/host/etc/ssl/openssl.cnf || \
-			  printf '%s\n' 'openssl_conf = openssl_init' '[openssl_init]' > /builder/shared-workdir/build/staging_dir/host/etc/ssl/openssl.cnf ); \
+		printf '%s\n' 'openssl_conf = openssl_init' '[openssl_init]' > /builder/shared-workdir/build/staging_dir/host/etc/ssl/openssl.cnf; \
 	fi
-	umask 022; OPENSSL_CONF=/etc/ssl/openssl.cnf $(MAKE) -C $< image \
+	umask 022; OPENSSL_CONF=${BUILDDIR}/${imagebuilder}/staging_dir/host/etc/ssl/openssl.cnf $(MAKE) -C $< image \
 		PROFILE=${PLATFORM} \
 		PACKAGES="${PACKAGES}" \
 		FILES=${FILES} \
