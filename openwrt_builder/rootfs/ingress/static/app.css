@@ -124,6 +124,25 @@ body {
     justify-content: flex-end;
 }
 
+.entity-bulk-bar {
+    margin-bottom: 10px;
+}
+
+.entity-panel {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px;
+    background: #fff;
+}
+
+.entity-panel-toolbar {
+    margin-bottom: 10px;
+}
+
+.entity-panel .table {
+    margin: 0;
+}
+
 @media (max-width: 860px) {
     .split-toolbar {
         flex-direction: column;
@@ -131,6 +150,10 @@ body {
     }
 
     .toolbar-group-bulk {
+        justify-content: flex-start;
+    }
+
+    .entity-panel-toolbar .toolbar-group {
         justify-content: flex-start;
     }
 }

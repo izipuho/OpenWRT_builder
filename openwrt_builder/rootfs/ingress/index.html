@@ -131,13 +131,8 @@
         </section>
 
         <section id="view-lists" class="view hidden" role="tabpanel" aria-labelledby="tab-lists" aria-hidden="true">
-            <div class="toolbar split-toolbar">
-                <div class="toolbar-group toolbar-group-main">
-                    <button id="lists-refresh" type="button" class="icon-btn icon-refresh" title="Refresh lists" aria-label="Refresh lists"></button>
-                    <button id="lists-create" type="button" class="icon-btn icon-create" title="Create list" aria-label="Create list"></button>
-                    <button id="lists-sort-name" type="button" class="icon-btn icon-sort-name sort-icon-btn" title="Sort by name" aria-label="Sort by name"></button>
-                    <button id="lists-sort-updated" type="button" class="icon-btn icon-sort-updated sort-icon-btn" title="Sort by updated" aria-label="Sort by updated"></button>
-                    <input id="lists-search" type="search" placeholder="name or id" aria-label="Search lists" />
+            <div class="toolbar split-toolbar entity-bulk-bar">
+                <div class="toolbar-group">
                     <button id="lists-import-run" type="button">Import from files/lists</button>
                 </div>
                 <div class="toolbar-group toolbar-group-bulk">
@@ -146,27 +141,46 @@
                     <button id="lists-delete-selected" type="button">Delete selected</button>
                 </div>
             </div>
-            <div id="lists-table" class="table"></div>
+            <div class="entity-panel">
+                <div class="toolbar split-toolbar entity-panel-toolbar">
+                    <div class="toolbar-group">
+                        <button id="lists-sort-name" type="button" class="icon-btn icon-sort-name sort-icon-btn" title="Sort by name" aria-label="Sort by name"></button>
+                        <button id="lists-sort-updated" type="button" class="icon-btn icon-sort-updated sort-icon-btn" title="Sort by updated" aria-label="Sort by updated"></button>
+                        <input id="lists-search" type="search" placeholder="name or id" aria-label="Search lists" />
+                    </div>
+                    <div class="toolbar-group">
+                        <button id="lists-refresh" type="button" class="icon-btn icon-refresh" title="Refresh lists" aria-label="Refresh lists"></button>
+                        <button id="lists-create" type="button" class="icon-btn icon-create" title="Create list" aria-label="Create list"></button>
+                    </div>
+                </div>
+                <div id="lists-table" class="table"></div>
+            </div>
             <div id="lists-editor" class="editor hidden"></div>
             <pre id="lists-error" class="error hidden"></pre>
         </section>
 
         <section id="view-profiles" class="view hidden" role="tabpanel" aria-labelledby="tab-profiles" aria-hidden="true">
-            <div class="toolbar split-toolbar">
-                <div class="toolbar-group toolbar-group-main">
-                    <button id="profiles-refresh" type="button" class="icon-btn icon-refresh" title="Refresh profiles" aria-label="Refresh profiles"></button>
-                    <button id="profiles-create" type="button" class="icon-btn icon-create" title="Create profile" aria-label="Create profile"></button>
-                    <button id="profiles-sort-name" type="button" class="icon-btn icon-sort-name sort-icon-btn" title="Sort by name" aria-label="Sort by name"></button>
-                    <button id="profiles-sort-updated" type="button" class="icon-btn icon-sort-updated sort-icon-btn" title="Sort by updated" aria-label="Sort by updated"></button>
-                    <input id="profiles-search" type="search" placeholder="name or id" aria-label="Search profiles" />
-                </div>
+            <div class="toolbar entity-bulk-bar">
                 <div class="toolbar-group toolbar-group-bulk">
                     <button id="profiles-select-all" type="button">Select all</button>
                     <button id="profiles-deselect-all" type="button">Deselect all</button>
                     <button id="profiles-delete-selected" type="button">Delete selected</button>
                 </div>
             </div>
-            <div id="profiles-table" class="table"></div>
+            <div class="entity-panel">
+                <div class="toolbar split-toolbar entity-panel-toolbar">
+                    <div class="toolbar-group">
+                        <button id="profiles-sort-name" type="button" class="icon-btn icon-sort-name sort-icon-btn" title="Sort by name" aria-label="Sort by name"></button>
+                        <button id="profiles-sort-updated" type="button" class="icon-btn icon-sort-updated sort-icon-btn" title="Sort by updated" aria-label="Sort by updated"></button>
+                        <input id="profiles-search" type="search" placeholder="name or id" aria-label="Search profiles" />
+                    </div>
+                    <div class="toolbar-group">
+                        <button id="profiles-refresh" type="button" class="icon-btn icon-refresh" title="Refresh profiles" aria-label="Refresh profiles"></button>
+                        <button id="profiles-create" type="button" class="icon-btn icon-create" title="Create profile" aria-label="Create profile"></button>
+                    </div>
+                </div>
+                <div id="profiles-table" class="table"></div>
+            </div>
             <div id="profiles-editor" class="editor hidden"></div>
             <pre id="profiles-error" class="error hidden"></pre>
         </section>
