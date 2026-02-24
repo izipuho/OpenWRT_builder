@@ -33,6 +33,16 @@ const fileTargetDrafts = new Map();
 
 const el = (id) => document.getElementById(id);
 
+function delegate(container, type, selector, handler) {
+    container[`on${type}`] = async (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const matched = target.closest(selector);
+        if (!matched || !container.contains(matched)) return;
+        await handler(matched, event);
+    };
+}
+
 function normalizeBackendAddress(input) {
     const value = String(input || "").trim();
     if (!value) return DEFAULT_BACKEND_ADDRESS;
@@ -483,18 +493,17 @@ function renderListsTable(rows) {
         }).join("")}
     </div>
   `;
-    el("lists-table").innerHTML = html;
+    const tableEl = el("lists-table");
+    tableEl.innerHTML = html;
     wireTableRowSelection("lists-table", "lists");
     wireCardRowToggle("lists-table", "lists");
     renderEntitySortButtons("lists");
 
-    el("lists-table").querySelectorAll("button").forEach((b) => {
-        b.addEventListener("click", async () => {
-            const id = b.getAttribute("data-id");
-            const act = b.getAttribute("data-act");
-            if (act === "edit") await openListEditor(id);
-            if (act === "del") await deleteList(id);
-        });
+    delegate(tableEl, "click", "button[data-act][data-id]", async (btn) => {
+        const id = btn.getAttribute("data-id");
+        const act = btn.getAttribute("data-act");
+        if (act === "edit") await openListEditor(id);
+        if (act === "del") await deleteList(id);
     });
 }
 
@@ -799,18 +808,17 @@ function renderProfilesTable(rows) {
         }).join("")}
     </div>
   `;
-    el("profiles-table").innerHTML = html;
+    const tableEl = el("profiles-table");
+    tableEl.innerHTML = html;
     wireTableRowSelection("profiles-table", "profiles");
     wireCardRowToggle("profiles-table", "profiles");
     renderEntitySortButtons("profiles");
 
-    el("profiles-table").querySelectorAll("button").forEach((b) => {
-        b.addEventListener("click", async () => {
-            const id = b.getAttribute("data-id");
-            const act = b.getAttribute("data-act");
-            if (act === "edit") await openProfileEditor(id);
-            if (act === "del") await deleteProfile(id);
-        });
+    delegate(tableEl, "click", "button[data-act][data-id]", async (btn) => {
+        const id = btn.getAttribute("data-id");
+        const act = btn.getAttribute("data-act");
+        if (act === "edit") await openProfileEditor(id);
+        if (act === "del") await deleteProfile(id);
     });
 }
 
@@ -1294,31 +1302,30 @@ function renderBuildsTable(rows) {
       </tbody>
     </table>
   `;
-    el("builds-table").innerHTML = html;
+    const tableEl = el("builds-table");
+    tableEl.innerHTML = html;
     wireTableRowSelection("builds-table", "builds");
 
-    el("builds-table").querySelectorAll("button").forEach((b) => {
-        b.addEventListener("click", async () => {
-            const buildId = b.getAttribute("data-id");
-            const act = b.getAttribute("data-act");
-            if (act === "params") {
-                await viewBuildRequest(buildId, b);
-            } else if (act === "show-message") {
-                const fullMessage = String(byId.get(String(buildId || ""))?.message ?? "");
-                if (!fullMessage) return;
-                await viewBuildMessage(buildId, fullMessage, b);
-            } else if (act === "logs") {
-                await viewBuildLogs(buildId, b);
-            } else if (act === "stop") {
-                await cancelBuild(buildId);
-            } else if (act === "rebuild") {
-                await rebuildBuild(buildId);
-            } else if (act === "delete") {
-                await deleteBuild(buildId);
-            } else if (act === "download") {
-                await downloadBuild(buildId);
-            }
-        });
+    delegate(tableEl, "click", "button[data-act][data-id]", async (btn) => {
+        const buildId = btn.getAttribute("data-id");
+        const act = btn.getAttribute("data-act");
+        if (act === "params") {
+            await viewBuildRequest(buildId, btn);
+        } else if (act === "show-message") {
+            const fullMessage = String(byId.get(String(buildId || ""))?.message ?? "");
+            if (!fullMessage) return;
+            await viewBuildMessage(buildId, fullMessage, btn);
+        } else if (act === "logs") {
+            await viewBuildLogs(buildId, btn);
+        } else if (act === "stop") {
+            await cancelBuild(buildId);
+        } else if (act === "rebuild") {
+            await rebuildBuild(buildId);
+        } else if (act === "delete") {
+            await deleteBuild(buildId);
+        } else if (act === "download") {
+            await downloadBuild(buildId);
+        }
     });
 }
 
@@ -1632,43 +1639,43 @@ function renderFilesTable(rows) {
       </tbody>
     </table>
   `;
-    el("files-table").innerHTML = html;
+    const tableEl = el("files-table");
+    tableEl.innerHTML = html;
 
-    el("files-table").querySelectorAll("button[data-act='save-target']").forEach((b) => {
-        b.addEventListener("click", async () => {
-            const sourcePath = String(b.getAttribute("data-source-path") || "").trim();
-            const row = b.closest("tr");
+    delegate(tableEl, "click", "button[data-act]", async (btn) => {
+        const act = btn.getAttribute("data-act");
+        if (act === "save-target") {
+            const sourcePath = String(btn.getAttribute("data-source-path") || "").trim();
+            const row = btn.closest("tr");
             const input = row?.querySelector("input[data-file-target-input]");
             const nextTarget = String(input?.value || "").trim();
             await updateFileTarget(sourcePath, nextTarget);
-        });
-    });
-    el("files-table").querySelectorAll("button[data-act='reset-target']").forEach((b) => {
-        b.addEventListener("click", async () => {
-            const sourcePathKey = String(b.getAttribute("data-source-path") || "").trim();
-            const sourcePath = String(b.getAttribute("data-source") || "").trim();
+            return;
+        }
+        if (act === "reset-target") {
+            const sourcePathKey = String(btn.getAttribute("data-source-path") || "").trim();
+            const sourcePath = String(btn.getAttribute("data-source") || "").trim();
             await updateFileTarget(sourcePathKey, sourcePath);
-        });
-    });
-    el("files-table").querySelectorAll("input[data-file-target-input]").forEach((input) => {
-        input.addEventListener("input", () => {
-            const sourcePath = String(input.getAttribute("data-source-path") || "").trim();
-            if (!sourcePath) return;
-            fileTargetDrafts.set(sourcePath, String(input.value || ""));
-        });
-        input.addEventListener("keydown", async (event) => {
-            if (event.key !== "Enter") return;
-            event.preventDefault();
-            const sourcePath = String(input.getAttribute("data-source-path") || "").trim();
-            const nextTarget = String(input.value || "").trim();
-            await updateFileTarget(sourcePath, nextTarget);
-        });
-    });
-    el("files-table").querySelectorAll("button[data-act='del']").forEach((b) => {
-        b.addEventListener("click", async () => {
-            const path = b.getAttribute("data-path");
+            return;
+        }
+        if (act === "del") {
+            const path = btn.getAttribute("data-path");
             await deleteFile(path);
-        });
+        }
+    });
+
+    delegate(tableEl, "input", "input[data-file-target-input]", (input) => {
+        const sourcePath = String(input.getAttribute("data-source-path") || "").trim();
+        if (!sourcePath) return;
+        fileTargetDrafts.set(sourcePath, String(input.value || ""));
+    });
+
+    delegate(tableEl, "keydown", "input[data-file-target-input]", async (input, event) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        const sourcePath = String(input.getAttribute("data-source-path") || "").trim();
+        const nextTarget = String(input.value || "").trim();
+        await updateFileTarget(sourcePath, nextTarget);
     });
 }
 
