@@ -24,6 +24,9 @@
         <section id="view-builds" class="view">
             <div class="toolbar">
                 <button id="builds-refresh" type="button">Refresh</button>
+                <button id="builds-select-all" type="button">Select all</button>
+                <button id="builds-deselect-all" type="button">Deselect all</button>
+                <button id="builds-delete-selected" type="button">Delete selected</button>
             </div>
             <div id="builds-table" class="table"></div>
             <pre id="builds-error" class="error hidden"></pre>
@@ -127,6 +130,9 @@
                 <button id="lists-refresh" type="button">Refresh</button>
                 <button id="lists-create" type="button">Create</button>
                 <button id="lists-import-run" type="button">Import from files/lists</button>
+                <button id="lists-select-all" type="button">Select all</button>
+                <button id="lists-deselect-all" type="button">Deselect all</button>
+                <button id="lists-delete-selected" type="button">Delete selected</button>
             </div>
             <div id="lists-table" class="table"></div>
             <div id="lists-editor" class="editor hidden"></div>
@@ -137,9 +143,13 @@
             <div class="toolbar">
                 <button id="profiles-refresh" type="button">Refresh</button>
                 <button id="profiles-create" type="button">Create</button>
+                <button id="profiles-select-all" type="button">Select all</button>
+                <button id="profiles-deselect-all" type="button">Deselect all</button>
+                <button id="profiles-delete-selected" type="button">Delete selected</button>
             </div>
             <div id="profiles-table" class="table"></div>
             <div id="profiles-editor" class="editor hidden"></div>
+            <pre id="profiles-error" class="error hidden"></pre>
         </section>
 
         <section id="view-files" class="view hidden">

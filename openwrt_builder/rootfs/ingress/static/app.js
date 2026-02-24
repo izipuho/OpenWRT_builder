@@ -4,6 +4,11 @@ const API = "api/v1";
 const EXAMPLES_BASE = "examples";
 const BUILDS_AUTO_REFRESH_MS = 2000;
 let buildsAutoRefreshHandle = null;
+const rowSelection = {
+    lists: new Set(),
+    profiles: new Set(),
+    builds: new Set(),
+};
 
 const templateCache = {
     list: null,
@@ -131,18 +136,85 @@ function sortByUpdatedAtDesc(rows) {
     });
 }
 
+function syncRowSelection(scope, ids) {
+    if (!rowSelection[scope]) return;
+    const currentIds = new Set((ids || []).map((id) => String(id || "").trim()).filter(Boolean));
+    rowSelection[scope] = new Set(Array.from(rowSelection[scope]).filter((id) => currentIds.has(id)));
+}
+
+function wireTableRowSelection(containerId, scope) {
+    const container = el(containerId);
+    container.querySelectorAll(`input[data-select-scope="${scope}"][data-id]`).forEach((input) => {
+        input.addEventListener("change", () => {
+            const id = String(input.getAttribute("data-id") || "").trim();
+            if (!id) return;
+            if (input.checked) rowSelection[scope].add(id);
+            else rowSelection[scope].delete(id);
+        });
+    });
+}
+
+function setVisibleRowSelection(scope, checked) {
+    const selected = Boolean(checked);
+    document.querySelectorAll(`input[data-select-scope="${scope}"][data-id]`).forEach((input) => {
+        if (input.disabled) return;
+        const id = String(input.getAttribute("data-id") || "").trim();
+        if (!id) return;
+        input.checked = selected;
+        if (selected) rowSelection[scope].add(id);
+        else rowSelection[scope].delete(id);
+    });
+}
+
+async function deleteSelectedItems({
+    scope,
+    errorSetter,
+    deleteOne,
+    successRefresh,
+    entityLabel,
+}) {
+    const ids = Array.from(rowSelection[scope] || []);
+    if (!ids.length) {
+        errorSetter(`No ${entityLabel} selected`);
+        return;
+    }
+
+    errorSetter("");
+    const errors = [];
+    for (const id of ids) {
+        try {
+            await deleteOne(id);
+            rowSelection[scope].delete(id);
+        } catch (e) {
+            errors.push(`${id}: ${String(e.message || e)}`);
+        }
+    }
+
+    await successRefresh();
+    if (errors.length) {
+        errorSetter(`Deleted ${ids.length - errors.length}/${ids.length} ${entityLabel}\n${errors.join("\n")}`);
+        return;
+    }
+    errorSetter(`Deleted ${ids.length} ${entityLabel}`);
+}
+
 function renderListsTable(rows) {
     const sortedRows = sortByUpdatedAtDesc(rows);
+    const ids = sortedRows.map((r) => r.list_id ?? r.id ?? "");
+    syncRowSelection("lists", ids);
     const html = `
     <table>
       <thead>
-        <tr><th>id</th><th>name</th><th>updated_at</th><th></th></tr>
+        <tr><th></th><th>id</th><th>name</th><th>updated_at</th><th></th></tr>
       </thead>
       <tbody>
         ${sortedRows.map((r) => {
         const id = r.list_id ?? r.id ?? "";
         return `
           <tr>
+            <td class="select-cell">
+              <input type="checkbox" data-select-scope="lists" data-id="${escapeAttr(id)}" ${rowSelection.lists.has(String(id)) ? "checked" : ""} />
+            </td>
             <td>${escapeHtml(id)}</td>
             <td>${escapeHtml(r.name ?? "")}</td>
             <td>${renderUpdatedAtCell(r.updated_at)}</td>
@@ -157,6 +229,7 @@ function renderListsTable(rows) {
     </table>
   `;
     el("lists-table").innerHTML = html;
+    wireTableRowSelection("lists-table", "lists");
 
     el("lists-table").querySelectorAll("button").forEach((b) => {
         b.addEventListener("click", async () => {
@@ -427,16 +500,21 @@ function checklistHtml(group, options, selected, emptyText = "No items available
 
 function renderProfilesTable(rows) {
     const sortedRows = sortByUpdatedAtDesc(rows);
+    const ids = sortedRows.map((r) => r.profile_id ?? r.id ?? "");
+    syncRowSelection("profiles", ids);
     const html = `
     <table>
       <thead>
-        <tr><th>id</th><th>name</th><th>updated_at</th><th></th></tr>
+        <tr><th></th><th>id</th><th>name</th><th>updated_at</th><th></th></tr>
       </thead>
       <tbody>
         ${sortedRows.map((r) => {
         const id = r.profile_id ?? r.id ?? "";
         return `
             <tr>
+              <td class="select-cell">
+                <input type="checkbox" data-select-scope="profiles" data-id="${escapeAttr(id)}" ${rowSelection.profiles.has(String(id)) ? "checked" : ""} />
+              </td>
               <td>${escapeHtml(id)}</td>
               <td>${escapeHtml(r.name ?? "")}</td>
               <td>${renderUpdatedAtCell(r.updated_at)}</td>
@@ -451,6 +529,7 @@ function renderProfilesTable(rows) {
     </table>
   `;
     el("profiles-table").innerHTML = html;
+    wireTableRowSelection("profiles-table", "profiles");
 
     el("profiles-table").querySelectorAll("button").forEach((b) => {
         b.addEventListener("click", async () => {
@@ -463,8 +542,15 @@ function renderProfilesTable(rows) {
 }
 
 async function refreshProfiles() {
+    showProfilesError("");
     const rows = await apiJson(`${API}/profiles`);
     renderProfilesTable(rows);
+}
+
+function showProfilesError(err = "") {
+    const msg = String(err || "").trim();
+    el("profiles-error").textContent = msg;
+    el("profiles-error").classList.toggle("hidden", !msg);
 }
 
 function showProfilesEditor(html) {
@@ -844,11 +930,15 @@ async function syncBuildSelectors() {
 
 function renderBuildsTable(rows) {
     const sortedRows = sortByUpdatedAtDesc(rows);
+    const ids = sortedRows
+        .filter((row) => String(row?.state || "") !== "running")
+        .map((row) => row?.build_id || "");
+    syncRowSelection("builds", ids);
     const byId = new Map(sortedRows.map((row) => [String(row?.build_id || ""), row]));
     const html = `
     <table>
       <thead>
-        <tr><th>build_id</th><th>state</th><th>phase</th><th>progress</th><th>updated_at</th><th>message</th><th></th></tr>
+        <tr><th></th><th>build_id</th><th>state</th><th>phase</th><th>progress</th><th>updated_at</th><th>message</th><th></th></tr>
       </thead>
       <tbody>
         ${sortedRows.map((r) => {
@@ -861,6 +951,9 @@ function renderBuildsTable(rows) {
         const fullMessage = String(r.message ?? "");
         return `
           <tr>
+            <td class="select-cell">
+              <input type="checkbox" data-select-scope="builds" data-id="${escapeAttr(buildId)}" ${canDelete ? "" : "disabled"} ${rowSelection.builds.has(String(buildId)) ? "checked" : ""} />
+            </td>
             <td>${escapeHtml(buildId)}</td>
             <td>${renderBuildStateBadge(state)}</td>
             <td>${escapeHtml(formatPhase(r.phase))}</td>
@@ -910,6 +1003,7 @@ function renderBuildsTable(rows) {
     </table>
   `;
     el("builds-table").innerHTML = html;
+    wireTableRowSelection("builds-table", "builds");
 
     el("builds-table").querySelectorAll("button").forEach((b) => {
         b.addEventListener("click", async () => {
@@ -1179,6 +1273,18 @@ async function deleteBuild(buildId) {
     await refreshBuilds();
 }
 
+async function deleteSelectedBuilds() {
+    await deleteSelectedItems({
+        scope: "builds",
+        errorSetter: showBuildsError,
+        deleteOne: async (buildId) => {
+            await apiJson(`${API}/build/${encodeURIComponent(buildId)}`, { method: "DELETE" });
+        },
+        successRefresh: refreshBuilds,
+        entityLabel: "build(s)",
+    });
+}
+
 /* ---------------- Files ---------------- */
 
 function showFilesError(err = "") {
@@ -1249,6 +1355,30 @@ async function deleteFile(path) {
     await refreshFiles();
 }
 
+async function deleteSelectedLists() {
+    await deleteSelectedItems({
+        scope: "lists",
+        errorSetter: showListsError,
+        deleteOne: async (id) => {
+            await apiJson(`${API}/list/${encodeURIComponent(id)}`, { method: "DELETE" });
+        },
+        successRefresh: refreshLists,
+        entityLabel: "list(s)",
+    });
+}
+
+async function deleteSelectedProfiles() {
+    await deleteSelectedItems({
+        scope: "profiles",
+        errorSetter: showProfilesError,
+        deleteOne: async (id) => {
+            await apiJson(`${API}/profile/${encodeURIComponent(id)}`, { method: "DELETE" });
+        },
+        successRefresh: refreshProfiles,
+        entityLabel: "profile(s)",
+    });
+}
+
 /* ---------------- Utils + boot ---------------- */
 
 function escapeHtml(s) {
@@ -1271,6 +1401,9 @@ function boot() {
     el("tab-files").addEventListener("click", () => setTab("files"));
 
     el("builds-refresh").addEventListener("click", () => refreshBuilds().catch((e) => showBuildsError(e.message || e)));
+    el("builds-select-all").addEventListener("click", () => setVisibleRowSelection("builds", true));
+    el("builds-deselect-all").addEventListener("click", () => setVisibleRowSelection("builds", false));
+    el("builds-delete-selected").addEventListener("click", () => deleteSelectedBuilds().catch((e) => showBuildsError(e.message || e)));
     el("builds-create").addEventListener("click", () => createBuild().catch((e) => showBuildsError(e.message || e)));
     el("builds-version").addEventListener("change", () => syncBuildSelectors().catch((e) => showBuildsError(e.message || e)));
     el("builds-target").addEventListener("change", () => syncBuildSelectors().catch((e) => showBuildsError(e.message || e)));
@@ -1327,9 +1460,15 @@ function boot() {
     el("lists-refresh").addEventListener("click", () => refreshLists().catch((e) => showListsError(e.message || e)));
     el("lists-create").addEventListener("click", () => openListEditor(null).catch((e) => showListsError(e.message || e)));
     el("lists-import-run").addEventListener("click", () => importLists().catch((e) => showListsError(e.message || e)));
+    el("lists-select-all").addEventListener("click", () => setVisibleRowSelection("lists", true));
+    el("lists-deselect-all").addEventListener("click", () => setVisibleRowSelection("lists", false));
+    el("lists-delete-selected").addEventListener("click", () => deleteSelectedLists().catch((e) => showListsError(e.message || e)));
 
-    el("profiles-refresh").addEventListener("click", () => refreshProfiles().catch(() => { }));
-    el("profiles-create").addEventListener("click", () => openProfileEditor(null).catch(() => { }));
+    el("profiles-refresh").addEventListener("click", () => refreshProfiles().catch((e) => showProfilesError(e.message || e)));
+    el("profiles-create").addEventListener("click", () => openProfileEditor(null).catch((e) => showProfilesError(e.message || e)));
+    el("profiles-select-all").addEventListener("click", () => setVisibleRowSelection("profiles", true));
+    el("profiles-deselect-all").addEventListener("click", () => setVisibleRowSelection("profiles", false));
+    el("profiles-delete-selected").addEventListener("click", () => deleteSelectedProfiles().catch((e) => showProfilesError(e.message || e)));
     el("files-refresh").addEventListener("click", () => refreshFiles().catch((e) => showFilesError(e.message || e)));
     el("files-upload").addEventListener("click", () => uploadFiles().catch((e) => showFilesError(e.message || e)));
 
@@ -1343,7 +1482,7 @@ function boot() {
         }, BUILDS_AUTO_REFRESH_MS);
     }
     refreshLists().catch((e) => showListsError(e.message || e));
-    refreshProfiles().catch(() => { });
+    refreshProfiles().catch((e) => showProfilesError(e.message || e));
     refreshFiles().catch((e) => showFilesError(e.message || e));
 }
 
