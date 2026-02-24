@@ -72,6 +72,11 @@ files: ${FILES}
 
 
 $C/.images-built: ${BUILDDIR}/${imagebuilder} ${FILES} ${DEPS}
+	mkdir -p ${BUILDDIR}/${imagebuilder}/tmp
+	mkdir -p ${BUILDDIR}/${imagebuilder}/staging_dir/host/etc/ssl
+	[ -f ${BUILDDIR}/${imagebuilder}/staging_dir/host/etc/ssl/openssl.cnf ] || \
+		( [ -f /etc/ssl/openssl.cnf ] && cp /etc/ssl/openssl.cnf ${BUILDDIR}/${imagebuilder}/staging_dir/host/etc/ssl/openssl.cnf || \
+		  printf '%s\n' 'openssl_conf = openssl_init' '[openssl_init]' > ${BUILDDIR}/${imagebuilder}/staging_dir/host/etc/ssl/openssl.cnf )
 	umask 022; $(MAKE) -C $< image \
 		PROFILE=${PLATFORM} \
 		PACKAGES="${PACKAGES}" \

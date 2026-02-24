@@ -433,6 +433,10 @@ class ImageBuilderExecutor:
         stdout_log = logs_dir / "stdout.log"
         stderr_log = logs_dir / "stderr.log"
         proc: subprocess.Popen[str] | None = None
+        env = os.environ.copy()
+        env["TMPDIR"] = "/tmp"
+        env["TMP"] = "/tmp"
+        env["TEMP"] = "/tmp"
         self._emit_update(
             on_update,
             progress=24,
@@ -448,6 +452,7 @@ class ImageBuilderExecutor:
                     cmd,
                     cwd=self._wrapper_dir,
                     text=True,
+                    env=env,
                     stdout=out_f,
                     stderr=err_f,
                     preexec_fn=os.setsid,
