@@ -1399,6 +1399,63 @@ function normalizeBuildRequest(request = {}) {
     };
 }
 
+function ensureSelectValue(selectId, value, missingLabelPrefix = "Unavailable: ") {
+    const select = el(selectId);
+    if (!select) return "";
+    const normalized = String(value || "").trim();
+    if (!normalized) return "";
+    const existing = Array.from(select.options || []).find((opt) => String(opt.value || "") === normalized);
+    if (!existing) {
+        const option = document.createElement("option");
+        option.value = normalized;
+        option.textContent = `${missingLabelPrefix}${normalized}`;
+        select.append(option);
+    }
+    select.value = normalized;
+    return normalized;
+}
+
+function applyBuildImagesSelection(outputImages = []) {
+    const wanted = new Set(
+        (Array.isArray(outputImages) ? outputImages : [])
+            .map((value) => String(value || "").trim())
+            .filter(Boolean)
+    );
+    const inputs = Array.from(document.querySelectorAll('input[data-group="builds-images"]'));
+    if (!inputs.length) return;
+    inputs.forEach((input) => {
+        input.checked = wanted.has(String(input.value || "").trim());
+    });
+    if (!inputs.some((input) => input.checked)) {
+        const fallback = inputs.find((input) => String(input.value || "").trim() === "sysupgrade") || inputs[0];
+        fallback.checked = true;
+    }
+}
+
+async function preloadBuildForm(request, { forceRebuild = false } = {}) {
+    const normalized = normalizeBuildRequest(request || {});
+    if (!normalized.profile_id || !normalized.platform || !normalized.target || !normalized.subtarget || !normalized.version) {
+        throw new Error("Build request payload is incomplete");
+    }
+
+    ensureSelectValue("builds-version", normalized.version);
+    await syncBuildSelectors();
+    ensureSelectValue("builds-target", normalized.target);
+    await syncBuildSelectors();
+    ensureSelectValue("builds-subtarget", normalized.subtarget);
+    await syncBuildSelectors();
+    ensureSelectValue("builds-platform", normalized.platform);
+    ensureSelectValue("builds-profile", normalized.profile_id, "Unavailable profile: ");
+    applyBuildImagesSelection(normalized.options.output_images);
+    el("builds-debug").checked = Boolean(normalized.options.debug);
+    el("builds-force").checked = forceRebuild || Boolean(normalized.options.force_rebuild);
+
+    const launchToggle = document.querySelector("details.build-launch-toggle");
+    if (launchToggle instanceof HTMLDetailsElement) {
+        launchToggle.open = true;
+    }
+}
+
 async function fetchBuild(buildId) {
     return apiJson(`${API}/build/${encodeURIComponent(buildId)}`);
 }
@@ -1526,20 +1583,7 @@ async function rebuildBuild(buildId) {
     if (!request.profile_id || !request.platform || !request.target || !request.subtarget || !request.version) {
         throw new Error(`Build ${buildId} has invalid request payload`);
     }
-
-    await apiJson(`${API}/build`, {
-        method: "POST",
-        body: JSON.stringify({
-            request: {
-                ...request,
-                options: {
-                    ...request.options,
-                    force_rebuild: true,
-                },
-            },
-        }),
-    });
-    await refreshBuilds();
+    await preloadBuildForm(request, { forceRebuild: true });
 }
 
 async function cancelBuild(buildId) {
