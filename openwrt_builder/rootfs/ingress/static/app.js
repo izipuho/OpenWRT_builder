@@ -1437,8 +1437,7 @@ function normalizeDirPath(path) {
     const value = String(path || "").trim().replace(/\\/g, "/");
     if (!value) return "";
     if (value === ".") return ".";
-    if (value.startsWith("/")) return "";
-    const dir = value.replace(/\/+$/, "");
+    const dir = value.replace(/^\/+/, "").replace(/\/+$/, "");
     if (!dir) return "";
     const parts = dir.split("/");
     if (parts.some((part) => part === "" || part === "." || part === "..")) return "";
