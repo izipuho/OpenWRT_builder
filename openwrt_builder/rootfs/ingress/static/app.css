@@ -57,6 +57,34 @@ body {
     margin: 0 0 12px 0;
 }
 
+.split-toolbar {
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px 14px;
+}
+
+.toolbar-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.toolbar-group-bulk {
+    justify-content: flex-end;
+}
+
+@media (max-width: 860px) {
+    .split-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .toolbar-group-bulk {
+        justify-content: flex-start;
+    }
+}
+
 #view-builds > .table {
     margin-bottom: 16px;
 }
