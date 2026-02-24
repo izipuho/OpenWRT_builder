@@ -1,0 +1,11 @@
+{
+    "name": "Profile name",
+    "schema_version": 1,
+    "updated_at": "2026-02-02T07:48:09Z",
+    "profile": {
+        "lists": [],
+        "extra_include": [],
+        "extra_exclude": [],
+        "files": []
+    }
+}

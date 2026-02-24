@@ -1,0 +1,226 @@
+<!-- rootfs/ingress/index.html -->
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>OpenWRT Builder</title>
+    <link rel="stylesheet" href="static/app.css" />
+</head>
+
+<body>
+    <header class="header">
+        <h1 class="title">OpenWRT Builder</h1>
+        <nav class="tabs" role="tablist" aria-label="Main sections">
+            <button id="tab-builds" class="tab active" type="button" role="tab" aria-controls="view-builds" aria-selected="true">Builds</button>
+            <button id="tab-lists" class="tab" type="button" role="tab" aria-controls="view-lists" aria-selected="false" tabindex="-1">Lists</button>
+            <button id="tab-profiles" class="tab" type="button" role="tab" aria-controls="view-profiles" aria-selected="false" tabindex="-1">Profiles</button>
+            <button id="tab-files" class="tab" type="button" role="tab" aria-controls="view-files" aria-selected="false" tabindex="-1">Files</button>
+            <button id="tab-settings" class="tab" type="button" role="tab" aria-controls="view-settings" aria-selected="false" tabindex="-1">Settings</button>
+        </nav>
+    </header>
+
+    <main class="main">
+        <section id="view-builds" class="view" role="tabpanel" aria-labelledby="tab-builds">
+            <details class="build-launch-toggle">
+                <summary>Start build</summary>
+                <div class="build-launch">
+                    <div class="build-sections">
+                        <section class="build-section">
+                            <h3 class="build-section-title">Version</h3>
+                            <div class="toolbar">
+                                <select id="builds-version" class="build-field"></select>
+                            </div>
+                        </section>
+                        <section class="build-section">
+                            <h3 class="build-section-title">target / subtarget / platform / profile</h3>
+                            <div class="toolbar">
+                                <select id="builds-target" class="build-field"></select>
+                                <select id="builds-subtarget" class="build-field"></select>
+                                <select id="builds-platform" class="build-field"></select>
+                                <select id="builds-profile" class="build-field"></select>
+                            </div>
+                        </section>
+                        <section class="build-section">
+                            <h3 class="build-section-title">sysupgrade / factory</h3>
+                            <div class="checklist build-images">
+                                <label class="checkitem">
+                                    <input type="checkbox" data-group="builds-images" value="sysupgrade" checked />
+                                    <span class="checktext">
+                                        <span class="checktitle">sysupgrade</span>
+                                    </span>
+                                </label>
+                                <label class="checkitem">
+                                    <input type="checkbox" data-group="builds-images" value="factory" />
+                                    <span class="checktext">
+                                        <span class="checktitle">factory</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </section>
+                        <section class="build-section">
+                            <h3 class="build-section-title">build options</h3>
+                            <div class="checklist build-options">
+                                <label class="checkitem">
+                                    <input id="builds-force" type="checkbox" />
+                                    <span class="checktext">
+                                        <span class="checktitle">force_rebuild</span>
+                                    </span>
+                                </label>
+                                <label class="checkitem">
+                                    <input id="builds-debug" type="checkbox" />
+                                    <span class="checktext">
+                                        <span class="checktitle">debug</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </section>
+                    </div>
+                    <div class="row buttons">
+                        <button id="builds-create" type="button" class="build-run-btn">
+                            <svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                                <path d="M12 2a10 10 0 1 0 10 10A10.01 10.01 0 0 0 12 2Zm-2 14.5v-9l7 4.5Z" />
+                            </svg>
+                            <span>Build</span>
+                        </button>
+                    </div>
+                </div>
+            </details>
+            <div class="builds-list-panel">
+                <div class="toolbar split-toolbar builds-list-toolbar">
+                    <div class="toolbar-group toolbar-group-main">
+                        <button id="builds-refresh" type="button" class="icon-btn icon-refresh" title="Refresh builds" aria-label="Refresh builds"></button>
+                    </div>
+                    <div class="toolbar-group toolbar-group-bulk">
+                        <button id="builds-select-all" type="button">Select all</button>
+                        <button id="builds-deselect-all" type="button">Deselect all</button>
+                        <button id="builds-delete-selected" type="button">Delete selected</button>
+                    </div>
+                </div>
+                <div id="builds-table" class="table"></div>
+                <pre id="builds-error" class="error hidden"></pre>
+            </div>
+            <div id="builds-request-tooltip" class="request-tooltip hidden" role="dialog" aria-live="polite">
+                <div class="request-tooltip-head">
+                    <div id="builds-request-tooltip-title" class="request-tooltip-title">Build request</div>
+                </div>
+                <div class="json-wrap">
+                    <button
+                        id="builds-request-tooltip-copy"
+                        type="button"
+                        class="message-copy-icon request-copy-icon"
+                        title="Copy request JSON"
+                        aria-label="Copy request JSON"
+                    ></button>
+                    <pre id="builds-request-tooltip-body" class="json-view"></pre>
+                </div>
+            </div>
+            <div id="builds-message-tooltip" class="request-tooltip hidden" role="dialog" aria-live="polite">
+                <div class="request-tooltip-head">
+                    <div id="builds-message-tooltip-title" class="request-tooltip-title">Build message</div>
+                </div>
+                <div class="json-wrap">
+                    <button
+                        id="builds-message-tooltip-copy"
+                        type="button"
+                        class="message-copy-icon request-copy-icon"
+                        title="Copy full message"
+                        aria-label="Copy full message"
+                    ></button>
+                    <pre id="builds-message-tooltip-body" class="json-view"></pre>
+                </div>
+            </div>
+
+        </section>
+
+        <section id="view-lists" class="view hidden" role="tabpanel" aria-labelledby="tab-lists" aria-hidden="true">
+            <div class="toolbar split-toolbar entity-bulk-bar">
+                <div class="toolbar-group">
+                    <button id="lists-import-run" type="button">Import from files/lists</button>
+                </div>
+                <div class="toolbar-group toolbar-group-bulk">
+                    <button id="lists-select-all" type="button">Select all</button>
+                    <button id="lists-deselect-all" type="button">Deselect all</button>
+                    <button id="lists-delete-selected" type="button">Delete selected</button>
+                </div>
+            </div>
+            <div class="entity-panel">
+                <div class="toolbar split-toolbar entity-panel-toolbar">
+                    <div class="toolbar-group">
+                        <button id="lists-sort-name" type="button" class="icon-btn icon-sort-name sort-icon-btn" title="Sort by name" aria-label="Sort by name"></button>
+                        <button id="lists-sort-updated" type="button" class="icon-btn icon-sort-updated sort-icon-btn" title="Sort by updated" aria-label="Sort by updated"></button>
+                        <input id="lists-search" type="search" placeholder="name or id" aria-label="Search lists" />
+                    </div>
+                    <div class="toolbar-group">
+                        <button id="lists-refresh" type="button" class="icon-btn icon-refresh" title="Refresh lists" aria-label="Refresh lists"></button>
+                        <button id="lists-create" type="button" class="icon-btn icon-create" title="Create list" aria-label="Create list"></button>
+                    </div>
+                </div>
+                <div id="lists-editor" class="editor floating-editor hidden"></div>
+                <div id="lists-table" class="table"></div>
+            </div>
+            <pre id="lists-error" class="error hidden"></pre>
+        </section>
+
+        <section id="view-profiles" class="view hidden" role="tabpanel" aria-labelledby="tab-profiles" aria-hidden="true">
+            <div class="toolbar entity-bulk-bar">
+                <div class="toolbar-group toolbar-group-bulk">
+                    <button id="profiles-select-all" type="button">Select all</button>
+                    <button id="profiles-deselect-all" type="button">Deselect all</button>
+                    <button id="profiles-delete-selected" type="button">Delete selected</button>
+                </div>
+            </div>
+            <div class="entity-panel">
+                <div class="toolbar split-toolbar entity-panel-toolbar">
+                    <div class="toolbar-group">
+                        <button id="profiles-sort-name" type="button" class="icon-btn icon-sort-name sort-icon-btn" title="Sort by name" aria-label="Sort by name"></button>
+                        <button id="profiles-sort-updated" type="button" class="icon-btn icon-sort-updated sort-icon-btn" title="Sort by updated" aria-label="Sort by updated"></button>
+                        <input id="profiles-search" type="search" placeholder="name or id" aria-label="Search profiles" />
+                    </div>
+                    <div class="toolbar-group">
+                        <button id="profiles-refresh" type="button" class="icon-btn icon-refresh" title="Refresh profiles" aria-label="Refresh profiles"></button>
+                        <button id="profiles-create" type="button" class="icon-btn icon-create" title="Create profile" aria-label="Create profile"></button>
+                    </div>
+                </div>
+                <div id="profiles-editor" class="editor floating-editor hidden"></div>
+                <div id="profiles-table" class="table"></div>
+            </div>
+            <pre id="profiles-error" class="error hidden"></pre>
+        </section>
+
+        <section id="view-files" class="view hidden" role="tabpanel" aria-labelledby="tab-files" aria-hidden="true">
+            <div class="toolbar">
+                <input id="files-input" type="file" multiple />
+                <input id="files-target-path" type="text" placeholder="target_path directory in rootfs (optional, e.g. /etc/dropbear)" />
+                <button id="files-upload" type="button">Upload</button>
+                <button id="files-refresh" type="button" class="icon-btn icon-refresh" title="Refresh files" aria-label="Refresh files"></button>
+            </div>
+            <div id="files-table" class="table"></div>
+            <pre id="files-error" class="error hidden"></pre>
+        </section>
+
+        <section id="view-settings" class="view hidden" role="tabpanel" aria-labelledby="tab-settings" aria-hidden="true">
+            <div class="editor">
+                <h2>Settings</h2>
+                <div class="api-config">
+                    <label for="api-backend-address">Backend address</label>
+                    <input id="api-backend-address" type="text" placeholder="http://10.8.25.20:8080 (empty = same origin)" spellcheck="false" />
+                    <label for="api-path">API path</label>
+                    <input id="api-path" type="text" value="api/v1" placeholder="api/v1" spellcheck="false" />
+                    <button id="api-base-apply" type="button">Apply</button>
+                    <button id="api-base-reset" type="button">Reset</button>
+                </div>
+                <div id="api-base-state" class="muted"></div>
+                <div class="muted">
+                    Effective API base is built as <code>{backend}/{api-path}</code>. Examples endpoint uses <code>{backend}/examples</code>.
+                </div>
+            </div>
+        </section>
+    </main>
+    <div id="editor-backdrop" class="editor-backdrop hidden" aria-hidden="true"></div>
+
+    <script src="static/app.js"></script>
+</body>
+
+</html>

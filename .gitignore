@@ -1,0 +1,8 @@
+.DS_Store
+TODO
+openwrt_builder/cache/*
+openwrt_builder/data/lists/*
+!openwrt_builder/data/lists/raw/
+openwrt_builder/data/profiles/*
+openwrt_builder/data/files/*
+openwrt_builder/data/builds/*

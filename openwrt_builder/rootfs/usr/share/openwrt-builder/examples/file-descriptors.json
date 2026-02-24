@@ -1,0 +1,13 @@
+{
+    "schema_version": 1,
+    "files": [
+        {
+            "source_path": "regulatory.db",
+            "target_path": "lib/firmware"
+        },
+        {
+            "source_path": "wifi_enable",
+            "target_path": "etc/uci-defaults"
+        }
+    ]
+}

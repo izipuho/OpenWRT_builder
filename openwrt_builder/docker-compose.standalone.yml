@@ -1,0 +1,15 @@
+services:
+  openwrt-builder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: standalone
+    container_name: openwrt-builder
+    ports:
+      - "8081:8080"
+    env_file:
+      - ./.env
+    volumes:
+      - ./data:/data
+      - ./cache:/cache
+    restart: unless-stopped
