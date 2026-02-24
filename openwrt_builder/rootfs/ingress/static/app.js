@@ -14,6 +14,7 @@ const templateCache = {
     list: null,
     profile: null,
 };
+const fileTargetDrafts = new Map();
 
 const el = (id) => document.getElementById(id);
 
@@ -450,17 +451,16 @@ async function getFileChoices() {
     const rows = await apiJson(`${API}/files`);
     return rows
         .map((r) => {
-            const id = String(r.id || "").trim();
             const sourcePath = String(r.source_path || r.path || "").trim();
             const targetPath = String(r.target_path || sourcePath).trim();
-            if (!id || !sourcePath || !targetPath) return null;
+            if (!sourcePath || !targetPath) return null;
             const targetPathUi = toUiRootfsDir(targetPath);
             return {
-                id,
+                id: sourcePath,
                 sourcePath,
                 targetPath,
                 title: sourcePath === targetPath ? sourcePath : `${sourcePath} -> ${targetPathUi}`,
-                meta: typeof r.size === "number" ? `${r.size} bytes` : id,
+                meta: typeof r.size === "number" ? `${r.size} bytes` : sourcePath,
             };
         })
         .filter(Boolean);
@@ -1300,27 +1300,37 @@ function showFilesError(err = "") {
 
 function renderFilesTable(rows) {
     const sortedRows = sortByUpdatedAtDesc(rows);
+    const visibleSources = new Set(
+        sortedRows.map((r) => String(r?.source_path || r?.path || "").trim()).filter(Boolean)
+    );
+    Array.from(fileTargetDrafts.keys()).forEach((sourcePath) => {
+        if (!visibleSources.has(sourcePath)) fileTargetDrafts.delete(sourcePath);
+    });
     const html = `
     <table>
       <thead>
         <tr><th>source_path</th><th>target_path</th><th>size</th><th>updated_at</th><th></th></tr>
       </thead>
       <tbody>
-        ${sortedRows.map((r) => `
+        ${sortedRows.map((r) => {
+            const rowSource = String(r.source_path ?? r.path ?? "").trim();
+            const fallbackTarget = toUiRootfsDir(r.target_path ?? r.source_path ?? r.path ?? "");
+            const currentTarget = fileTargetDrafts.has(rowSource) ? String(fileTargetDrafts.get(rowSource) || "") : fallbackTarget;
+            return `
           <tr>
-            <td>${escapeHtml(r.source_path ?? r.path ?? "")}</td>
+            <td>${escapeHtml(rowSource)}</td>
             <td>
               <div class="file-target-edit">
                 <input
                   type="text"
                   data-file-target-input
-                  data-id="${escapeAttr(r.id ?? "")}"
-                  data-default="${escapeAttr(toUiRootfsDir(r.target_path ?? r.source_path ?? r.path ?? ""))}"
-                  value="${escapeAttr(toUiRootfsDir(r.target_path ?? r.source_path ?? r.path ?? ""))}"
+                  data-source-path="${escapeAttr(rowSource)}"
+                  data-default="${escapeAttr(fallbackTarget)}"
+                  value="${escapeAttr(currentTarget)}"
                 />
                 <div class="file-target-actions">
-                  <button type="button" data-act="save-target" data-id="${escapeAttr(r.id ?? "")}">Save</button>
-                  <button type="button" data-act="reset-target" data-source="${escapeAttr(toUiRootfsDir(sourceDir(r.source_path ?? r.path ?? "")))}" data-id="${escapeAttr(r.id ?? "")}">Reset</button>
+                  <button type="button" data-act="save-target" data-source-path="${escapeAttr(rowSource)}">Save</button>
+                  <button type="button" data-act="reset-target" data-source="${escapeAttr(toUiRootfsDir(sourceDir(rowSource)))}" data-source-path="${escapeAttr(rowSource)}">Reset</button>
                 </div>
               </div>
             </td>
@@ -1330,7 +1340,8 @@ function renderFilesTable(rows) {
               <button type="button" data-act="del" data-path="${escapeAttr(r.source_path ?? r.path ?? "")}">Delete</button>
             </td>
           </tr>
-        `).join("")}
+        `;
+    }).join("")}
       </tbody>
     </table>
   `;
@@ -1338,27 +1349,32 @@ function renderFilesTable(rows) {
 
     el("files-table").querySelectorAll("button[data-act='save-target']").forEach((b) => {
         b.addEventListener("click", async () => {
-            const fileId = String(b.getAttribute("data-id") || "").trim();
+            const sourcePath = String(b.getAttribute("data-source-path") || "").trim();
             const row = b.closest("tr");
             const input = row?.querySelector("input[data-file-target-input]");
             const nextTarget = String(input?.value || "").trim();
-            await updateFileTarget(fileId, nextTarget);
+            await updateFileTarget(sourcePath, nextTarget);
         });
     });
     el("files-table").querySelectorAll("button[data-act='reset-target']").forEach((b) => {
         b.addEventListener("click", async () => {
-            const fileId = String(b.getAttribute("data-id") || "").trim();
+            const sourcePathKey = String(b.getAttribute("data-source-path") || "").trim();
             const sourcePath = String(b.getAttribute("data-source") || "").trim();
-            await updateFileTarget(fileId, sourcePath);
+            await updateFileTarget(sourcePathKey, sourcePath);
         });
     });
     el("files-table").querySelectorAll("input[data-file-target-input]").forEach((input) => {
+        input.addEventListener("input", () => {
+            const sourcePath = String(input.getAttribute("data-source-path") || "").trim();
+            if (!sourcePath) return;
+            fileTargetDrafts.set(sourcePath, String(input.value || ""));
+        });
         input.addEventListener("keydown", async (event) => {
             if (event.key !== "Enter") return;
             event.preventDefault();
-            const fileId = String(input.getAttribute("data-id") || "").trim();
+            const sourcePath = String(input.getAttribute("data-source-path") || "").trim();
             const nextTarget = String(input.value || "").trim();
-            await updateFileTarget(fileId, nextTarget);
+            await updateFileTarget(sourcePath, nextTarget);
         });
     });
     el("files-table").querySelectorAll("button[data-act='del']").forEach((b) => {
@@ -1411,17 +1427,24 @@ async function deleteFile(path) {
     await refreshFiles();
 }
 
-async function updateFileTarget(fileId, nextTarget) {
+async function updateFileTarget(sourcePath, nextTarget) {
     showFilesError("");
+    const normalizedSource = String(sourcePath || "").trim();
+    if (!normalizedSource) {
+        showFilesError("source_path is required");
+        return;
+    }
     const normalized = fromUiRootfsDir(nextTarget);
     if (!normalized) {
         showFilesError("target_path directory is required (example: /etc/dropbear)");
         return;
     }
-    await apiJson(`${API}/file-meta/${encodeURIComponent(fileId)}`, {
+    fileTargetDrafts.set(normalizedSource, String(nextTarget || ""));
+    await apiJson(`${API}/file-meta/${encodeURIComponent(normalizedSource)}`, {
         method: "PUT",
         body: JSON.stringify({ target_path: normalized }),
     });
+    fileTargetDrafts.delete(normalizedSource);
     await refreshFiles();
 }
 

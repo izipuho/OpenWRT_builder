@@ -350,7 +350,7 @@ class ImageBuilderExecutor:
 
         return self._uniq(include), self._uniq(exclude), selected_files
 
-    def _load_file_descriptors(self) -> dict[str, tuple[str, str]]:
+    def _load_file_descriptors(self) -> dict[str, str]:
         path = self._files_dir / _FILES_DESCRIPTORS_BASENAME
         if not path.exists():
             return {}
@@ -361,11 +361,10 @@ class ImageBuilderExecutor:
         rows = payload.get("files")
         if not isinstance(rows, list):
             return {}
-        out: dict[str, tuple[str, str]] = {}
+        out: dict[str, str] = {}
         for row in rows:
             if not isinstance(row, dict):
                 continue
-            file_id = str(row.get("id") or "").strip()
             source_raw = row.get("source_path")
             if not isinstance(source_raw, str):
                 continue
@@ -377,14 +376,13 @@ class ImageBuilderExecutor:
                 target_path = "." if target_raw.strip() == "." else self._safe_file_rel(target_raw)
             except ValueError:
                 continue
-            if file_id:
-                out[file_id] = (source_path, target_path)
+            out[source_path] = target_path
         return out
 
     def _resolve_selected_files(
         self,
         raw_files: list[Any],
-        descriptors: dict[str, tuple[str, str]],
+        descriptors: dict[str, str],
     ) -> list[tuple[str, str]]:
         selected: list[tuple[str, str]] = []
         seen: set[tuple[str, str]] = set()
@@ -392,10 +390,10 @@ class ImageBuilderExecutor:
             file_ref = str(item or "").strip()
             if not file_ref:
                 raise ValueError("invalid_profile_file_path")
-            pair = descriptors.get(file_ref)
-            if pair is None:
-                raise FileNotFoundError(f"selected_file_not_found:{file_ref}")
-            src_rel, target_dir = pair
+            src_rel = self._safe_file_rel(file_ref)
+            target_dir = descriptors.get(src_rel)
+            if target_dir is None:
+                raise FileNotFoundError(f"selected_file_not_found:{src_rel}")
             src_name = Path(src_rel).name
             dst_rel = src_name if target_dir == "." else f"{target_dir}/{src_name}"
             pair = (src_rel, self._safe_file_rel(dst_rel))

@@ -2,12 +2,10 @@
     "schema_version": 1,
     "files": [
         {
-            "id": "regulatory-db-7d8a1f2b",
             "source_path": "regulatory.db",
             "target_path": "lib/firmware"
         },
         {
-            "id": "wifi-enable-9a1c5d33",
             "source_path": "wifi_enable",
             "target_path": "etc/uci-defaults"
         }

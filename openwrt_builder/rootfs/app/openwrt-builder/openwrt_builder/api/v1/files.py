@@ -21,7 +21,7 @@ FILES_REGISTRY = FilesRegistry(env_path("OPENWRT_BUILDER_FILES_DIR"))
 
 @router.get("/files", response_model=list[FileOut])
 def list_files(req: Request):
-    """List uploaded files with ``id/source_path/target_path`` metadata."""
+    """List uploaded files with ``source_path/target_path`` metadata."""
     _ = req
     return FILES_REGISTRY.list()
 
@@ -36,12 +36,12 @@ def upload_file(req: Request, file: UploadFile = File(...), target_path: str | N
         raise http_400(exc)
 
 
-@router.put("/file-meta/{file_id}", status_code=200, response_model=FileOut)
-def update_file_meta(req: Request, file_id: str, body: FileMetaUpdateIn):
-    """Update destination directory metadata for a file by descriptor ID."""
+@router.put("/file-meta/{file_path:path}", status_code=200, response_model=FileOut)
+def update_file_meta(req: Request, file_path: str, body: FileMetaUpdateIn):
+    """Update destination directory metadata for a file by source path."""
     _ = req
     try:
-        return FILES_REGISTRY.update_meta(file_id=file_id, target_path=body.target_path)
+        return FILES_REGISTRY.update_meta(file_path=file_path, target_path=body.target_path)
     except ValueError as exc:
         raise http_400(exc)
     except FileNotFoundError:

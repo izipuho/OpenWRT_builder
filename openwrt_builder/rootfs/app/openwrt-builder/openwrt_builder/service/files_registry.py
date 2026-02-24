@@ -1,27 +1,25 @@
-"""Registry helpers for uploaded files and their target paths."""
+"""Registry helpers for uploaded files and their target directories."""
 from __future__ import annotations
 
-import hashlib
 import json
-import re
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
 from pydantic import ValidationError
 
 from openwrt_builder.service.models import (
     FileDescriptorModel,
     FileDescriptorsIndexModel,
     FileRowModel,
-    validate_file_id,
     validate_rel_dir,
     validate_rel_path,
 )
 
 
 def _normalize_rel_path(path: str) -> str:
-    """Return a normalized relative path or raise ``ValueError``."""
+    """Return a normalized relative file path or raise ``ValueError``."""
     return validate_rel_path(path)
 
 
@@ -35,21 +33,8 @@ def _mtime_utc(path: Path) -> str:
     return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def _make_file_id(source_path: str, used_ids: set[str]) -> str:
-    """Build a stable descriptor ID from source path."""
-    stem = re.sub(r"[^A-Za-z0-9_.-]+", "-", source_path.replace("/", "-")).strip(".-") or "file"
-    digest = hashlib.sha1(source_path.encode("utf-8")).hexdigest()[:8]
-    base = f"{stem}-{digest}"
-    if base not in used_ids:
-        return base
-    idx = 2
-    while f"{base}-{idx}" in used_ids:
-        idx += 1
-    return f"{base}-{idx}"
-
-
 class FilesRegistry:
-    """Manage uploaded files and metadata (id/source_path/target_path)."""
+    """Manage uploaded files and metadata (source_path/target_path)."""
 
     def __init__(self, files_dir: Path) -> None:
         self._files_dir = files_dir.resolve()
@@ -72,19 +57,16 @@ class FilesRegistry:
         rows: list[dict] = []
         for item in items:
             try:
-                row = FileDescriptorModel.model_validate(item).model_dump()
+                rows.append(FileDescriptorModel.model_validate(item).model_dump())
             except ValidationError:
                 continue
-            rows.append(row)
         return rows
 
     def _write_descriptors(self, rows: list[dict]) -> None:
         """Persist descriptors atomically."""
         self._files_dir.mkdir(parents=True, exist_ok=True)
         tmp = self._descriptors_path.with_suffix(".tmp")
-        payload = FileDescriptorsIndexModel.model_validate(
-            {"schema_version": 1, "files": rows}
-        ).model_dump()
+        payload = FileDescriptorsIndexModel.model_validate({"schema_version": 1, "files": rows}).model_dump()
         with tmp.open("w", encoding="utf-8") as fp:
             json.dump(payload, fp, ensure_ascii=True, indent=2, sort_keys=True)
             fp.write("\n")
@@ -101,24 +83,17 @@ class FilesRegistry:
 
         current_rows = self._read_descriptors()
         by_source: dict[str, dict] = {}
-        used_ids: set[str] = set()
-
         for row in current_rows:
             source = row["source_path"]
-            file_id = row["id"]
-            if source not in existing_sources or source in by_source or file_id in used_ids:
+            if source not in existing_sources or source in by_source:
                 continue
             by_source[source] = row
-            used_ids.add(file_id)
 
         changed = False
         for source in existing_sources:
             if source in by_source:
                 continue
-            file_id = _make_file_id(source, used_ids)
-            used_ids.add(file_id)
             by_source[source] = {
-                "id": file_id,
                 "source_path": source,
                 "target_path": _normalize_rel_dir(Path(source).parent.as_posix()),
             }
@@ -132,13 +107,14 @@ class FilesRegistry:
     def _build_row(self, descriptor: dict) -> dict:
         source = descriptor["source_path"]
         abs_path = (self._files_dir / source).resolve()
-        return FileRowModel.model_validate({
-            "id": descriptor["id"],
-            "source_path": source,
-            "target_path": descriptor["target_path"],
-            "size": abs_path.stat().st_size,
-            "updated_at": _mtime_utc(abs_path),
-        }).model_dump()
+        return FileRowModel.model_validate(
+            {
+                "source_path": source,
+                "target_path": descriptor["target_path"],
+                "size": abs_path.stat().st_size,
+                "updated_at": _mtime_utc(abs_path),
+            }
+        ).model_dump()
 
     def list(self) -> list[dict]:
         """Return all file rows sorted by ``updated_at`` descending."""
@@ -170,14 +146,14 @@ class FilesRegistry:
             return self._build_row(row)
         raise FileNotFoundError("file_not_found")
 
-    def update_meta(self, file_id: str, target_path: str) -> dict:
-        """Update ``target_path`` for one descriptor by ID."""
-        normalized_id = validate_file_id(file_id)
+    def update_meta(self, file_path: str, target_path: str) -> dict:
+        """Update ``target_path`` for one descriptor by ``source_path``."""
+        source = _normalize_rel_path(file_path)
         target = _normalize_rel_dir(target_path)
 
         rows = self._sync()
         for row in rows:
-            if row["id"] != normalized_id:
+            if row["source_path"] != source:
                 continue
             row["target_path"] = target
             self._write_descriptors(rows)
