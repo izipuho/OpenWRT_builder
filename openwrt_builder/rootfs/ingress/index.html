@@ -25,7 +25,7 @@
         <section id="view-builds" class="view" role="tabpanel" aria-labelledby="tab-builds">
             <div class="toolbar split-toolbar">
                 <div class="toolbar-group toolbar-group-main">
-                    <button id="builds-refresh" type="button">Refresh</button>
+                    <button id="builds-refresh" type="button" class="icon-btn icon-refresh" title="Refresh builds" aria-label="Refresh builds"></button>
                 </div>
                 <div class="toolbar-group toolbar-group-bulk">
                     <button id="builds-select-all" type="button">Select all</button>
@@ -133,8 +133,8 @@
         <section id="view-lists" class="view hidden" role="tabpanel" aria-labelledby="tab-lists" aria-hidden="true">
             <div class="toolbar split-toolbar">
                 <div class="toolbar-group toolbar-group-main">
-                    <button id="lists-refresh" type="button">Refresh</button>
-                    <button id="lists-create" type="button">Create</button>
+                    <button id="lists-refresh" type="button" class="icon-btn icon-refresh" title="Refresh lists" aria-label="Refresh lists"></button>
+                    <button id="lists-create" type="button" class="icon-btn icon-create" title="Create list" aria-label="Create list"></button>
                     <button id="lists-import-run" type="button">Import from files/lists</button>
                 </div>
                 <div class="toolbar-group toolbar-group-bulk">
@@ -151,8 +151,8 @@
         <section id="view-profiles" class="view hidden" role="tabpanel" aria-labelledby="tab-profiles" aria-hidden="true">
             <div class="toolbar split-toolbar">
                 <div class="toolbar-group toolbar-group-main">
-                    <button id="profiles-refresh" type="button">Refresh</button>
-                    <button id="profiles-create" type="button">Create</button>
+                    <button id="profiles-refresh" type="button" class="icon-btn icon-refresh" title="Refresh profiles" aria-label="Refresh profiles"></button>
+                    <button id="profiles-create" type="button" class="icon-btn icon-create" title="Create profile" aria-label="Create profile"></button>
                 </div>
                 <div class="toolbar-group toolbar-group-bulk">
                     <button id="profiles-select-all" type="button">Select all</button>
@@ -170,11 +170,7 @@
                 <input id="files-input" type="file" multiple />
                 <input id="files-target-path" type="text" placeholder="target_path directory in rootfs (optional, e.g. /etc/dropbear)" />
                 <button id="files-upload" type="button">Upload</button>
-                <button id="files-refresh" type="button">Refresh</button>
-            </div>
-            <div class="muted">
-                <code>target_path</code> is rootfs destination directory (e.g. <code>/etc/config</code> or <code>/lib/firmware</code>).
-                Filename is appended automatically. Use <code>/</code> for root.
+                <button id="files-refresh" type="button" class="icon-btn icon-refresh" title="Refresh files" aria-label="Refresh files"></button>
             </div>
             <div id="files-table" class="table"></div>
             <pre id="files-error" class="error hidden"></pre>

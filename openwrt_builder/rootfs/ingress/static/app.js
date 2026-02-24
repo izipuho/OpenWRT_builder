@@ -312,6 +312,19 @@ function wireTableRowSelection(containerId, scope) {
     });
 }
 
+function wireCardRowToggle(containerId, scope) {
+    const container = el(containerId);
+    container.querySelectorAll(`.entity-card[data-select-scope="${scope}"][data-id]`).forEach((card) => {
+        card.addEventListener("click", (event) => {
+            if (event.target.closest("button")) return;
+            const input = card.querySelector(`input[data-select-scope="${scope}"][data-id]`);
+            if (!input || input.disabled) return;
+            input.checked = !input.checked;
+            input.dispatchEvent(new Event("change"));
+        });
+    });
+}
+
 function setVisibleRowSelection(scope, checked) {
     const selected = Boolean(checked);
     document.querySelectorAll(`input[data-select-scope="${scope}"][data-id]`).forEach((input) => {
@@ -367,20 +380,17 @@ function renderListsTable(rows) {
       ${sortedRows.map((r) => {
             const id = r.list_id ?? r.id ?? "";
             return `
-        <article class="entity-card">
-          <div class="entity-card-head">
-            <label class="entity-card-select">
-              <input type="checkbox" data-select-scope="lists" data-id="${escapeAttr(id)}" ${rowSelection.lists.has(String(id)) ? "checked" : ""} />
-              <span>Select</span>
-            </label>
-            <div class="entity-card-actions">
-              <button type="button" data-act="edit" data-id="${escapeAttr(id)}">Edit</button>
-              <button type="button" data-act="del" data-id="${escapeAttr(id)}">Delete</button>
-            </div>
+        <article class="entity-card" data-select-scope="lists" data-id="${escapeAttr(id)}">
+          <input type="checkbox" data-select-scope="lists" data-id="${escapeAttr(id)}" ${rowSelection.lists.has(String(id)) ? "checked" : ""} />
+          <div class="entity-card-main">
+            <div class="entity-card-title">${escapeHtml(r.name ?? "") || "<span class=\"muted\">Unnamed list</span>"}</div>
+            <div class="entity-card-id">${escapeHtml(id)}</div>
           </div>
-          <div class="entity-card-title">${escapeHtml(r.name ?? "") || "<span class=\"muted\">Unnamed list</span>"}</div>
-          <div class="entity-card-meta"><span class="muted">id</span> ${escapeHtml(id)}</div>
-          <div class="entity-card-meta"><span class="muted">updated</span> ${renderUpdatedAtCell(r.updated_at) || "<span class=\"muted\">-</span>"}</div>
+          <div class="entity-card-meta"><span class="muted">upd.</span> ${renderUpdatedAtCell(r.updated_at) || "<span class=\"muted\">-</span>"}</div>
+          <div class="entity-card-actions">
+            <button type="button" class="icon-btn icon-edit" data-act="edit" data-id="${escapeAttr(id)}" title="Edit list" aria-label="Edit list"></button>
+            <button type="button" class="icon-btn icon-delete" data-act="del" data-id="${escapeAttr(id)}" title="Delete list" aria-label="Delete list"></button>
+          </div>
         </article>
       `;
         }).join("")}
@@ -388,6 +398,7 @@ function renderListsTable(rows) {
   `;
     el("lists-table").innerHTML = html;
     wireTableRowSelection("lists-table", "lists");
+    wireCardRowToggle("lists-table", "lists");
 
     el("lists-table").querySelectorAll("button").forEach((b) => {
         b.addEventListener("click", async () => {
@@ -671,20 +682,17 @@ function renderProfilesTable(rows) {
       ${sortedRows.map((r) => {
             const id = r.profile_id ?? r.id ?? "";
             return `
-        <article class="entity-card">
-          <div class="entity-card-head">
-            <label class="entity-card-select">
-              <input type="checkbox" data-select-scope="profiles" data-id="${escapeAttr(id)}" ${rowSelection.profiles.has(String(id)) ? "checked" : ""} />
-              <span>Select</span>
-            </label>
-            <div class="entity-card-actions">
-              <button type="button" data-act="edit" data-id="${escapeAttr(id)}">Edit</button>
-              <button type="button" data-act="del" data-id="${escapeAttr(id)}">Delete</button>
-            </div>
+        <article class="entity-card" data-select-scope="profiles" data-id="${escapeAttr(id)}">
+          <input type="checkbox" data-select-scope="profiles" data-id="${escapeAttr(id)}" ${rowSelection.profiles.has(String(id)) ? "checked" : ""} />
+          <div class="entity-card-main">
+            <div class="entity-card-title">${escapeHtml(r.name ?? "") || "<span class=\"muted\">Unnamed profile</span>"}</div>
+            <div class="entity-card-id">${escapeHtml(id)}</div>
           </div>
-          <div class="entity-card-title">${escapeHtml(r.name ?? "") || "<span class=\"muted\">Unnamed profile</span>"}</div>
-          <div class="entity-card-meta"><span class="muted">id</span> ${escapeHtml(id)}</div>
-          <div class="entity-card-meta"><span class="muted">updated</span> ${renderUpdatedAtCell(r.updated_at) || "<span class=\"muted\">-</span>"}</div>
+          <div class="entity-card-meta"><span class="muted">upd.</span> ${renderUpdatedAtCell(r.updated_at) || "<span class=\"muted\">-</span>"}</div>
+          <div class="entity-card-actions">
+            <button type="button" class="icon-btn icon-edit" data-act="edit" data-id="${escapeAttr(id)}" title="Edit profile" aria-label="Edit profile"></button>
+            <button type="button" class="icon-btn icon-delete" data-act="del" data-id="${escapeAttr(id)}" title="Delete profile" aria-label="Delete profile"></button>
+          </div>
         </article>
       `;
         }).join("")}
@@ -692,6 +700,7 @@ function renderProfilesTable(rows) {
   `;
     el("profiles-table").innerHTML = html;
     wireTableRowSelection("profiles-table", "profiles");
+    wireCardRowToggle("profiles-table", "profiles");
 
     el("profiles-table").querySelectorAll("button").forEach((b) => {
         b.addEventListener("click", async () => {
