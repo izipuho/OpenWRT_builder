@@ -162,8 +162,20 @@ body.modal-open {
     }
 }
 
-#view-builds>.table {
+.builds-list-panel {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px;
+    background: #fff;
     margin-bottom: 16px;
+}
+
+.builds-list-toolbar {
+    margin-bottom: 10px;
+}
+
+.builds-list-panel .table {
+    margin: 0;
 }
 
 .build-launch-toggle {

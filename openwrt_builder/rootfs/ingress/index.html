@@ -23,16 +23,6 @@
 
     <main class="main">
         <section id="view-builds" class="view" role="tabpanel" aria-labelledby="tab-builds">
-            <div class="toolbar split-toolbar">
-                <div class="toolbar-group toolbar-group-main">
-                    <button id="builds-refresh" type="button" class="icon-btn icon-refresh" title="Refresh builds" aria-label="Refresh builds"></button>
-                </div>
-                <div class="toolbar-group toolbar-group-bulk">
-                    <button id="builds-select-all" type="button">Select all</button>
-                    <button id="builds-deselect-all" type="button">Deselect all</button>
-                    <button id="builds-delete-selected" type="button">Delete selected</button>
-                </div>
-            </div>
             <details class="build-launch-toggle">
                 <summary>Start build</summary>
                 <div class="build-launch">
@@ -97,8 +87,20 @@
                     </div>
                 </div>
             </details>
-            <div id="builds-table" class="table"></div>
-            <pre id="builds-error" class="error hidden"></pre>
+            <div class="builds-list-panel">
+                <div class="toolbar split-toolbar builds-list-toolbar">
+                    <div class="toolbar-group toolbar-group-main">
+                        <button id="builds-refresh" type="button" class="icon-btn icon-refresh" title="Refresh builds" aria-label="Refresh builds"></button>
+                    </div>
+                    <div class="toolbar-group toolbar-group-bulk">
+                        <button id="builds-select-all" type="button">Select all</button>
+                        <button id="builds-deselect-all" type="button">Deselect all</button>
+                        <button id="builds-delete-selected" type="button">Delete selected</button>
+                    </div>
+                </div>
+                <div id="builds-table" class="table"></div>
+                <pre id="builds-error" class="error hidden"></pre>
+            </div>
             <div id="builds-request-tooltip" class="request-tooltip hidden" role="dialog" aria-live="polite">
                 <div class="request-tooltip-head">
                     <div id="builds-request-tooltip-title" class="request-tooltip-title">Build request</div>
