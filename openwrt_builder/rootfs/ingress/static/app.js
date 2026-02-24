@@ -21,8 +21,33 @@ const el = (id) => document.getElementById(id);
 function setTab(tab) {
     ["builds", "lists", "profiles", "files"].forEach((name) => {
         const active = tab === name;
-        el(`tab-${name}`).classList.toggle("active", active);
-        el(`view-${name}`).classList.toggle("hidden", !active);
+        const tabEl = el(`tab-${name}`);
+        const viewEl = el(`view-${name}`);
+        tabEl.classList.toggle("active", active);
+        tabEl.setAttribute("aria-selected", String(active));
+        tabEl.setAttribute("tabindex", active ? "0" : "-1");
+        viewEl.classList.toggle("hidden", !active);
+        viewEl.setAttribute("aria-hidden", String(!active));
+    });
+}
+
+function wireTabKeyboardNavigation() {
+    const tabNames = ["builds", "lists", "profiles", "files"];
+    tabNames.forEach((name, idx) => {
+        const tabEl = el(`tab-${name}`);
+        tabEl.addEventListener("keydown", (event) => {
+            let nextIdx = idx;
+            if (event.key === "ArrowRight") nextIdx = (idx + 1) % tabNames.length;
+            else if (event.key === "ArrowLeft") nextIdx = (idx - 1 + tabNames.length) % tabNames.length;
+            else if (event.key === "Home") nextIdx = 0;
+            else if (event.key === "End") nextIdx = tabNames.length - 1;
+            else return;
+
+            event.preventDefault();
+            const nextName = tabNames[nextIdx];
+            setTab(nextName);
+            el(`tab-${nextName}`).focus();
+        });
     });
 }
 
@@ -1525,6 +1550,7 @@ function boot() {
     el("tab-lists").addEventListener("click", () => setTab("lists"));
     el("tab-profiles").addEventListener("click", () => setTab("profiles"));
     el("tab-files").addEventListener("click", () => setTab("files"));
+    wireTabKeyboardNavigation();
 
     el("builds-refresh").addEventListener("click", () => refreshBuilds().catch((e) => showBuildsError(e.message || e)));
     el("builds-select-all").addEventListener("click", () => setVisibleRowSelection("builds", true));

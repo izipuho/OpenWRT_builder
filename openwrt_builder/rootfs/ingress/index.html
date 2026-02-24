@@ -12,16 +12,16 @@
 <body>
     <header class="header">
         <h1 class="title">OpenWRT Builder</h1>
-        <nav class="tabs">
-            <button id="tab-builds" class="tab active" type="button">Builds</button>
-            <button id="tab-lists" class="tab" type="button">Lists</button>
-            <button id="tab-profiles" class="tab" type="button">Profiles</button>
-            <button id="tab-files" class="tab" type="button">Files</button>
+        <nav class="tabs" role="tablist" aria-label="Main sections">
+            <button id="tab-builds" class="tab active" type="button" role="tab" aria-controls="view-builds" aria-selected="true">Builds</button>
+            <button id="tab-lists" class="tab" type="button" role="tab" aria-controls="view-lists" aria-selected="false" tabindex="-1">Lists</button>
+            <button id="tab-profiles" class="tab" type="button" role="tab" aria-controls="view-profiles" aria-selected="false" tabindex="-1">Profiles</button>
+            <button id="tab-files" class="tab" type="button" role="tab" aria-controls="view-files" aria-selected="false" tabindex="-1">Files</button>
         </nav>
     </header>
 
     <main class="main">
-        <section id="view-builds" class="view">
+        <section id="view-builds" class="view" role="tabpanel" aria-labelledby="tab-builds">
             <div class="toolbar split-toolbar">
                 <div class="toolbar-group toolbar-group-main">
                     <button id="builds-refresh" type="button">Refresh</button>
@@ -129,7 +129,7 @@
             </div>
         </section>
 
-        <section id="view-lists" class="view hidden">
+        <section id="view-lists" class="view hidden" role="tabpanel" aria-labelledby="tab-lists" aria-hidden="true">
             <div class="toolbar split-toolbar">
                 <div class="toolbar-group toolbar-group-main">
                     <button id="lists-refresh" type="button">Refresh</button>
@@ -147,7 +147,7 @@
             <pre id="lists-error" class="error hidden"></pre>
         </section>
 
-        <section id="view-profiles" class="view hidden">
+        <section id="view-profiles" class="view hidden" role="tabpanel" aria-labelledby="tab-profiles" aria-hidden="true">
             <div class="toolbar split-toolbar">
                 <div class="toolbar-group toolbar-group-main">
                     <button id="profiles-refresh" type="button">Refresh</button>
@@ -164,7 +164,7 @@
             <pre id="profiles-error" class="error hidden"></pre>
         </section>
 
-        <section id="view-files" class="view hidden">
+        <section id="view-files" class="view hidden" role="tabpanel" aria-labelledby="tab-files" aria-hidden="true">
             <div class="toolbar">
                 <input id="files-input" type="file" multiple />
                 <input id="files-target-path" type="text" placeholder="target_path directory in rootfs (optional, e.g. /etc/dropbear)" />
