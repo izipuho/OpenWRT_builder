@@ -153,9 +153,9 @@
                         <button id="lists-create" type="button" class="icon-btn icon-create" title="Create list" aria-label="Create list"></button>
                     </div>
                 </div>
+                <div id="lists-editor" class="editor floating-editor hidden"></div>
                 <div id="lists-table" class="table"></div>
             </div>
-            <div id="lists-editor" class="editor hidden"></div>
             <pre id="lists-error" class="error hidden"></pre>
         </section>
 
@@ -179,9 +179,9 @@
                         <button id="profiles-create" type="button" class="icon-btn icon-create" title="Create profile" aria-label="Create profile"></button>
                     </div>
                 </div>
+                <div id="profiles-editor" class="editor floating-editor hidden"></div>
                 <div id="profiles-table" class="table"></div>
             </div>
-            <div id="profiles-editor" class="editor hidden"></div>
             <pre id="profiles-error" class="error hidden"></pre>
         </section>
 
@@ -214,6 +214,7 @@
             </div>
         </section>
     </main>
+    <div id="editor-backdrop" class="editor-backdrop hidden" aria-hidden="true"></div>
 
     <script src="static/app.js"></script>
 </body>

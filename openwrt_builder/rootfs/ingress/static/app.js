@@ -523,11 +523,14 @@ async function importLists() {
 function showListsEditor(html) {
     el("lists-editor").innerHTML = html;
     el("lists-editor").classList.remove("hidden");
+    syncEditorsModalState();
+    el("lists-editor").scrollIntoView({ block: "start", behavior: "smooth" });
 }
 
 function hideListsEditor() {
     el("lists-editor").classList.add("hidden");
     el("lists-editor").innerHTML = "";
+    syncEditorsModalState();
 }
 
 function listEditorHtml(id, model) {
@@ -536,19 +539,26 @@ function listEditorHtml(id, model) {
     const schemaVersion = Number(model?.schema_version) || 1;
     const name = model?.name || "";
     return `
-    <h2>${id ? "Edit list" : "Create list"}</h2>
-    ${id ? `
-      <div class="row"><label>id</label><input id="list-id" value="${escapeAttr(id)}" disabled /></div>
-    ` : `
-      <div class="row"><label>list_id (optional)</label><input id="list-id" placeholder="slug" /></div>
-    `}
-    <div class="row"><label>name</label><input id="list-name" value="${escapeAttr(name)}" /></div>
-    <div class="row"><label>include (one per line)</label><textarea id="list-include" rows="8">${escapeHtml(includeText)}</textarea></div>
-    <div class="row"><label>exclude (one per line)</label><textarea id="list-exclude" rows="8">${escapeHtml(excludeText)}</textarea></div>
+    <div class="editor-head">
+      <h2>${id ? "Edit list" : "Create list"}</h2>
+      <button id="list-close" type="button" class="icon-btn icon-close editor-close-btn" title="Close" aria-label="Close"></button>
+    </div>
+    <div class="editor-grid editor-grid-2">
+      ${id ? `
+        <div class="row"><label>id</label><input id="list-id" value="${escapeAttr(id)}" disabled /></div>
+      ` : `
+        <div class="row"><label>list_id (optional)</label><input id="list-id" placeholder="slug" /></div>
+      `}
+      <div class="row"><label>name</label><input id="list-name" value="${escapeAttr(name)}" /></div>
+    </div>
+    <div class="editor-grid editor-grid-2">
+      <div class="row editor-field-block"><label>include (one per line)</label><textarea id="list-include" rows="10">${escapeHtml(includeText)}</textarea></div>
+      <div class="row editor-field-block"><label>exclude (one per line)</label><textarea id="list-exclude" rows="10">${escapeHtml(excludeText)}</textarea></div>
+    </div>
     <input id="list-schema-version" type="hidden" value="${escapeAttr(schemaVersion)}" />
-    <div class="row buttons">
-      <button id="list-save" type="button">Save</button>
+    <div class="row buttons editor-actions">
       <button id="list-cancel" type="button">Cancel</button>
+      <button id="list-save" type="button">Save</button>
     </div>
     <pre id="list-error" class="error hidden"></pre>
   `;
@@ -646,6 +656,7 @@ function wireListEditor(existingId) {
             await refreshLists();
         },
     });
+    el("list-close").addEventListener("click", hideListsEditor);
 }
 
 async function deleteList(id) {
@@ -818,11 +829,22 @@ function showProfilesError(err = "") {
 function showProfilesEditor(html) {
     el("profiles-editor").innerHTML = html;
     el("profiles-editor").classList.remove("hidden");
+    syncEditorsModalState();
+    el("profiles-editor").scrollIntoView({ block: "start", behavior: "smooth" });
 }
 
 function hideProfilesEditor() {
     el("profiles-editor").classList.add("hidden");
     el("profiles-editor").innerHTML = "";
+    syncEditorsModalState();
+}
+
+function syncEditorsModalState() {
+    const listsOpen = !el("lists-editor").classList.contains("hidden");
+    const profilesOpen = !el("profiles-editor").classList.contains("hidden");
+    const opened = listsOpen || profilesOpen;
+    el("editor-backdrop").classList.toggle("hidden", !opened);
+    document.body.classList.toggle("modal-open", opened);
 }
 
 function profileEditorHtml(id, model, listOptions, fileOptions) {
@@ -841,28 +863,35 @@ function profileEditorHtml(id, model, listOptions, fileOptions) {
         : selectedExistingFiles;
 
     return `
-    <h2>${id ? "Edit profile" : "Create profile"}</h2>
-    ${id ? `
-      <div class="row"><label>id</label><input id="profile-id" value="${escapeAttr(id)}" disabled /></div>
-    ` : `
-      <div class="row"><label>profile_id (optional)</label><input id="profile-id" placeholder="slug" /></div>
-    `}
-    <div class="row"><label>name</label><input id="profile-name" value="${escapeAttr(name)}" /></div>
+    <div class="editor-head">
+      <h2>${id ? "Edit profile" : "Create profile"}</h2>
+      <button id="profile-close" type="button" class="icon-btn icon-close editor-close-btn" title="Close" aria-label="Close"></button>
+    </div>
+    <div class="editor-grid editor-grid-2">
+      ${id ? `
+        <div class="row"><label>id</label><input id="profile-id" value="${escapeAttr(id)}" disabled /></div>
+      ` : `
+        <div class="row"><label>profile_id (optional)</label><input id="profile-id" placeholder="slug" /></div>
+      `}
+      <div class="row"><label>name</label><input id="profile-name" value="${escapeAttr(name)}" /></div>
+    </div>
     <div class="row"><label>lists</label>${checklistHtml("profile-lists", listOptions, selectedLists, "No lists available")}</div>
-    <div class="row"><label>include (one per line)</label><textarea id="profile-include" rows="8">${escapeHtml(includeText)}</textarea></div>
-    <div class="row"><label>exclude (one per line)</label><textarea id="profile-exclude" rows="8">${escapeHtml(excludeText)}</textarea></div>
-    <div class="row">
+    <div class="editor-grid editor-grid-2">
+      <div class="row editor-field-block"><label>include (one per line)</label><textarea id="profile-include" rows="10">${escapeHtml(includeText)}</textarea></div>
+      <div class="row editor-field-block"><label>exclude (one per line)</label><textarea id="profile-exclude" rows="10">${escapeHtml(excludeText)}</textarea></div>
+    </div>
+    <div class="row editor-section">
       <label>files</label>
-      <div class="row buttons">
+      <div class="row buttons editor-inline-actions">
         <button type="button" data-checklist-action="select-all" data-group="profile-files">Select all</button>
         <button type="button" data-checklist-action="deselect-all" data-group="profile-files">Deselect all</button>
       </div>
       ${checklistHtml("profile-files", normalizedFileOptions, defaultSelectedFiles, "No files uploaded")}
     </div>
     <input id="profile-schema-version" type="hidden" value="${escapeAttr(schemaVersion)}" />
-    <div class="row buttons">
-      <button id="profile-save" type="button">Save</button>
+    <div class="row buttons editor-actions">
       <button id="profile-cancel" type="button">Cancel</button>
+      <button id="profile-save" type="button">Save</button>
     </div>
     <pre id="profile-error" class="error hidden"></pre>
   `;
@@ -938,6 +967,7 @@ function wireProfileEditor(existingId) {
             await refreshProfiles();
         },
     });
+    el("profile-close").addEventListener("click", hideProfilesEditor);
 }
 
 async function deleteProfile(id) {
@@ -1845,10 +1875,18 @@ function boot() {
         hideBuildTooltips();
     });
     document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape") hideBuildTooltips();
+        if (event.key === "Escape") {
+            hideBuildTooltips();
+            hideListsEditor();
+            hideProfilesEditor();
+        }
     });
     window.addEventListener("resize", hideBuildTooltips);
     window.addEventListener("scroll", hideBuildTooltips, { passive: true });
+    el("editor-backdrop").addEventListener("click", () => {
+        hideListsEditor();
+        hideProfilesEditor();
+    });
 
     el("lists-refresh").addEventListener("click", () => refreshLists().catch((e) => showListsError(e.message || e)));
     el("lists-create").addEventListener("click", () => openListEditor(null).catch((e) => showListsError(e.message || e)));
