@@ -1358,7 +1358,7 @@ function renderFilesTable(rows) {
             await updateFileTarget(fileId, sourcePath);
         });
     });
-    el("files-table").querySelectorAll("input[data-file-target-input']").forEach((input) => {
+    el("files-table").querySelectorAll("input[data-file-target-input]").forEach((input) => {
         input.addEventListener("keydown", async (event) => {
             if (event.key !== "Enter") return;
             event.preventDefault();
