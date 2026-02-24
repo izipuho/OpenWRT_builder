@@ -167,13 +167,13 @@
         <section id="view-files" class="view hidden">
             <div class="toolbar">
                 <input id="files-input" type="file" multiple />
-                <input id="files-target-path" type="text" placeholder="target_path directory (optional)" />
+                <input id="files-target-path" type="text" placeholder="target_path directory in rootfs (optional, e.g. /etc/dropbear)" />
                 <button id="files-upload" type="button">Upload</button>
                 <button id="files-refresh" type="button">Refresh</button>
             </div>
             <div class="muted">
-                <code>target_path</code> is always a directory (e.g. <code>etc/config</code> or <code>lib/firmware</code>).
-                Filename is appended automatically. Use <code>.</code> for root. Leading <code>/</code> is accepted.
+                <code>target_path</code> is rootfs destination directory (e.g. <code>/etc/config</code> or <code>/lib/firmware</code>).
+                Filename is appended automatically. Use <code>/</code> for root.
             </div>
             <div id="files-table" class="table"></div>
             <pre id="files-error" class="error hidden"></pre>

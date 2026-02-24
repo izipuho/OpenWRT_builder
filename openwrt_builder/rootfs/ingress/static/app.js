@@ -454,11 +454,12 @@ async function getFileChoices() {
             const sourcePath = String(r.source_path || r.path || "").trim();
             const targetPath = String(r.target_path || sourcePath).trim();
             if (!id || !sourcePath || !targetPath) return null;
+            const targetPathUi = toUiRootfsDir(targetPath);
             return {
                 id,
                 sourcePath,
                 targetPath,
-                title: sourcePath === targetPath ? sourcePath : `${sourcePath} -> ${targetPath}`,
+                title: sourcePath === targetPath ? sourcePath : `${sourcePath} -> ${targetPathUi}`,
                 meta: typeof r.size === "number" ? `${r.size} bytes` : id,
             };
         })
@@ -1314,12 +1315,12 @@ function renderFilesTable(rows) {
                   type="text"
                   data-file-target-input
                   data-id="${escapeAttr(r.id ?? "")}"
-                  data-default="${escapeAttr(r.target_path ?? r.source_path ?? r.path ?? "")}"
-                  value="${escapeAttr(r.target_path ?? r.source_path ?? r.path ?? "")}"
+                  data-default="${escapeAttr(toUiRootfsDir(r.target_path ?? r.source_path ?? r.path ?? ""))}"
+                  value="${escapeAttr(toUiRootfsDir(r.target_path ?? r.source_path ?? r.path ?? ""))}"
                 />
                 <div class="file-target-actions">
                   <button type="button" data-act="save-target" data-id="${escapeAttr(r.id ?? "")}">Save</button>
-                  <button type="button" data-act="reset-target" data-source="${escapeAttr(sourceDir(r.source_path ?? r.path ?? ""))}" data-id="${escapeAttr(r.id ?? "")}">Reset</button>
+                  <button type="button" data-act="reset-target" data-source="${escapeAttr(toUiRootfsDir(sourceDir(r.source_path ?? r.path ?? "")))}" data-id="${escapeAttr(r.id ?? "")}">Reset</button>
                 </div>
               </div>
             </td>
@@ -1389,9 +1390,9 @@ async function uploadFiles() {
         const fd = new FormData();
         fd.append("file", file, file.name);
         if (targetPath) {
-            const baseDir = normalizeDirPath(targetPath);
+            const baseDir = fromUiRootfsDir(targetPath);
             if (!baseDir) {
-                showFilesError("invalid target_path directory");
+                showFilesError("invalid rootfs target directory");
                 return;
             }
             fd.append("target_path", baseDir);
@@ -1412,9 +1413,9 @@ async function deleteFile(path) {
 
 async function updateFileTarget(fileId, nextTarget) {
     showFilesError("");
-    const normalized = normalizeDirPath(nextTarget);
+    const normalized = fromUiRootfsDir(nextTarget);
     if (!normalized) {
-        showFilesError("target_path directory is required");
+        showFilesError("target_path directory is required (example: /etc/dropbear)");
         return;
     }
     await apiJson(`${API}/file-meta/${encodeURIComponent(fileId)}`, {
@@ -1442,6 +1443,19 @@ function normalizeDirPath(path) {
     const parts = dir.split("/");
     if (parts.some((part) => part === "" || part === "." || part === "..")) return "";
     return dir;
+}
+
+function toUiRootfsDir(path) {
+    const value = String(path || "").trim().replace(/\\/g, "/");
+    if (!value || value === ".") return "/";
+    return `/${value.replace(/^\/+/, "")}`;
+}
+
+function fromUiRootfsDir(path) {
+    const value = String(path || "").trim().replace(/\\/g, "/");
+    if (!value) return "";
+    if (value === "/" || value === ".") return ".";
+    return normalizeDirPath(value);
 }
 
 async function deleteSelectedLists() {
