@@ -171,7 +171,10 @@
                 <button id="files-upload" type="button">Upload</button>
                 <button id="files-refresh" type="button">Refresh</button>
             </div>
-            <div class="muted">Use rootfs paths like <code>etc/config/network</code> or <code>lib/firmware/regulatory.db</code>.</div>
+            <div class="muted">
+                <code>target_path</code> is always a directory (e.g. <code>etc/config</code> or <code>lib/firmware</code>).
+                Filename is appended automatically.
+            </div>
             <div id="files-table" class="table"></div>
             <pre id="files-error" class="error hidden"></pre>
         </section>

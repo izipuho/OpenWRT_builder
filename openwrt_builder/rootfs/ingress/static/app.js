@@ -1391,15 +1391,20 @@ async function uploadFiles() {
         showFilesError("Select at least one file");
         return;
     }
-    if (targetPath && files.length > 1) {
-        showFilesError("target_path can be set only for single file upload");
-        return;
-    }
 
     for (const file of files) {
         const fd = new FormData();
         fd.append("file", file, file.name);
-        if (targetPath) fd.append("target_path", targetPath);
+        if (targetPath) {
+            const baseDir = targetPath.replace(/\/+$/, "");
+            const fileName = String(file?.name || "").split("/").pop().split("\\").pop();
+            if (!baseDir || !fileName) {
+                showFilesError("invalid target_path or filename");
+                return;
+            }
+            const effectiveTarget = `${baseDir}/${fileName}`;
+            fd.append("target_path", effectiveTarget);
+        }
         await apiJson(`${API}/file`, { method: "POST", body: fd });
     }
 
