@@ -17,15 +17,17 @@ Home Assistant add-on that runs OpenWrt ImageBuilder and allows building custom 
 
 ## Usage
 
-1. Configure the add-on settings (target, profile, packages).
-2. Start the add-on.
-3. Wait for the build to complete.
-4. Download the generated firmware image.
+1. Start the add-on.
+2. Open the add-on ingress web UI.
+3. Configure build inputs in the UI (OpenWrt version, target/subtarget, platform/profile, package lists/files).
+4. Run the build and download the generated firmware image.
 
 ## Notes
 
 - ImageBuilder runs inside the add-on container.
 - The add-on does not flash devices automatically; it only builds firmware images.
+- Home Assistant add-on `options`/`schema` are intentionally empty in the current implementation.
+- Build parameters are configured inside the ingress web UI and stored in the add-on data directory.
 
 ## License
 
