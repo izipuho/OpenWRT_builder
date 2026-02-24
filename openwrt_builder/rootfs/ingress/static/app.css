@@ -182,6 +182,22 @@ body {
     max-width: 380px;
 }
 
+#files-target-path {
+    width: 340px;
+    max-width: 100%;
+}
+
+.file-target-edit {
+    display: grid;
+    gap: 6px;
+    min-width: 260px;
+}
+
+.file-target-actions {
+    display: flex;
+    gap: 6px;
+}
+
 button {
     border: 1px solid var(--border);
     background: #f6f6f6;

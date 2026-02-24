@@ -1315,11 +1315,24 @@ function renderFilesTable(rows) {
           <tr>
             <td>${escapeHtml(r.id ?? "")}</td>
             <td>${escapeHtml(r.source_path ?? r.path ?? "")}</td>
-            <td>${escapeHtml(r.target_path ?? r.source_path ?? r.path ?? "")}</td>
+            <td>
+              <div class="file-target-edit">
+                <input
+                  type="text"
+                  data-file-target-input
+                  data-id="${escapeAttr(r.id ?? "")}"
+                  data-default="${escapeAttr(r.target_path ?? r.source_path ?? r.path ?? "")}"
+                  value="${escapeAttr(r.target_path ?? r.source_path ?? r.path ?? "")}"
+                />
+                <div class="file-target-actions">
+                  <button type="button" data-act="save-target" data-id="${escapeAttr(r.id ?? "")}">Save</button>
+                  <button type="button" data-act="reset-target" data-source="${escapeAttr(r.source_path ?? r.path ?? "")}" data-id="${escapeAttr(r.id ?? "")}">Reset</button>
+                </div>
+              </div>
+            </td>
             <td>${escapeHtml(String(r.size ?? ""))}</td>
             <td>${renderUpdatedAtCell(r.updated_at)}</td>
             <td class="actions">
-              <button type="button" data-act="target" data-id="${escapeAttr(r.id ?? "")}" data-target="${escapeAttr(r.target_path ?? r.source_path ?? r.path ?? "")}">Target</button>
               <button type="button" data-act="del" data-path="${escapeAttr(r.source_path ?? r.path ?? "")}">Delete</button>
             </td>
           </tr>
@@ -1329,11 +1342,29 @@ function renderFilesTable(rows) {
   `;
     el("files-table").innerHTML = html;
 
-    el("files-table").querySelectorAll("button[data-act='target']").forEach((b) => {
+    el("files-table").querySelectorAll("button[data-act='save-target']").forEach((b) => {
         b.addEventListener("click", async () => {
             const fileId = String(b.getAttribute("data-id") || "").trim();
-            const currentTarget = String(b.getAttribute("data-target") || "").trim();
-            await updateFileTarget(fileId, currentTarget);
+            const row = b.closest("tr");
+            const input = row?.querySelector("input[data-file-target-input]");
+            const nextTarget = String(input?.value || "").trim();
+            await updateFileTarget(fileId, nextTarget);
+        });
+    });
+    el("files-table").querySelectorAll("button[data-act='reset-target']").forEach((b) => {
+        b.addEventListener("click", async () => {
+            const fileId = String(b.getAttribute("data-id") || "").trim();
+            const sourcePath = String(b.getAttribute("data-source") || "").trim();
+            await updateFileTarget(fileId, sourcePath);
+        });
+    });
+    el("files-table").querySelectorAll("input[data-file-target-input']").forEach((input) => {
+        input.addEventListener("keydown", async (event) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            const fileId = String(input.getAttribute("data-id") || "").trim();
+            const nextTarget = String(input.value || "").trim();
+            await updateFileTarget(fileId, nextTarget);
         });
     });
     el("files-table").querySelectorAll("button[data-act='del']").forEach((b) => {
@@ -1383,10 +1414,8 @@ async function deleteFile(path) {
     await refreshFiles();
 }
 
-async function updateFileTarget(fileId, currentTarget) {
+async function updateFileTarget(fileId, nextTarget) {
     showFilesError("");
-    const nextTarget = window.prompt("target_path in rootfs (example: etc/config/network)", String(currentTarget || ""));
-    if (nextTarget === null) return;
     const normalized = String(nextTarget || "").trim();
     if (!normalized) {
         showFilesError("target_path is required");
