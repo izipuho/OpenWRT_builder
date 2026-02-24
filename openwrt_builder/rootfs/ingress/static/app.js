@@ -1,6 +1,5 @@
 const BACKEND_ADDRESS_STORAGE_KEY = "openwrt_builder_backend_address";
 const API_PATH_STORAGE_KEY = "openwrt_builder_api_path";
-const LEGACY_API_BASE_STORAGE_KEY = "openwrt_builder_api_base";
 const DEFAULT_BACKEND_ADDRESS = "";
 const DEFAULT_API_PATH = "api/v1";
 const TAB_NAMES = ["builds", "lists", "profiles", "files", "settings"];
@@ -66,19 +65,6 @@ function buildExamplesBase(address) {
     return safeAddress ? `${safeAddress}/examples` : "examples";
 }
 
-function parseLegacyApiBase(input) {
-    const raw = String(input || "").trim().replace(/\/+$/, "");
-    if (!raw) return null;
-
-    let match = raw.match(/^(https?:\/\/[^/]+)\/(.+)$/i);
-    if (match) return { address: normalizeBackendAddress(match[1]), path: normalizeApiPath(match[2]) };
-
-    match = raw.match(/^\/?(.+)$/i);
-    if (match) return { address: DEFAULT_BACKEND_ADDRESS, path: normalizeApiPath(match[1]) };
-
-    return null;
-}
-
 function loadApiConfigFromStorage() {
     try {
         const addressStored = window.localStorage.getItem(BACKEND_ADDRESS_STORAGE_KEY);
@@ -89,10 +75,6 @@ function loadApiConfigFromStorage() {
                 path: normalizeApiPath(pathStored),
             };
         }
-
-        const legacy = window.localStorage.getItem(LEGACY_API_BASE_STORAGE_KEY);
-        const parsed = parseLegacyApiBase(legacy);
-        if (parsed) return parsed;
         return { address: DEFAULT_BACKEND_ADDRESS, path: DEFAULT_API_PATH };
     } catch (_) {
         return { address: DEFAULT_BACKEND_ADDRESS, path: DEFAULT_API_PATH };
