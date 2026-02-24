@@ -13,8 +13,8 @@ const rowSelection = {
     builds: new Set(),
 };
 const entitySort = {
-    lists: { field: "updated", direction: "desc" },
-    profiles: { field: "updated", direction: "desc" },
+    lists: { field: "name", direction: "asc" },
+    profiles: { field: "name", direction: "asc" },
 };
 const entitySearch = {
     lists: "",
