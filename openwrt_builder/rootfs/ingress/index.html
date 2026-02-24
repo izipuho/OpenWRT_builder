@@ -33,6 +33,70 @@
                     <button id="builds-delete-selected" type="button">Delete selected</button>
                 </div>
             </div>
+            <details class="build-launch-toggle">
+                <summary>Start build</summary>
+                <div class="build-launch">
+                    <div class="build-sections">
+                        <section class="build-section">
+                            <h3 class="build-section-title">Version</h3>
+                            <div class="toolbar">
+                                <select id="builds-version" class="build-field"></select>
+                            </div>
+                        </section>
+                        <section class="build-section">
+                            <h3 class="build-section-title">target / subtarget / platform / profile</h3>
+                            <div class="toolbar">
+                                <select id="builds-target" class="build-field"></select>
+                                <select id="builds-subtarget" class="build-field"></select>
+                                <select id="builds-platform" class="build-field"></select>
+                                <select id="builds-profile" class="build-field"></select>
+                            </div>
+                        </section>
+                        <section class="build-section">
+                            <h3 class="build-section-title">sysupgrade / factory</h3>
+                            <div class="checklist build-images">
+                                <label class="checkitem">
+                                    <input type="checkbox" data-group="builds-images" value="sysupgrade" checked />
+                                    <span class="checktext">
+                                        <span class="checktitle">sysupgrade</span>
+                                    </span>
+                                </label>
+                                <label class="checkitem">
+                                    <input type="checkbox" data-group="builds-images" value="factory" />
+                                    <span class="checktext">
+                                        <span class="checktitle">factory</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </section>
+                        <section class="build-section">
+                            <h3 class="build-section-title">build options</h3>
+                            <div class="checklist build-options">
+                                <label class="checkitem">
+                                    <input id="builds-force" type="checkbox" />
+                                    <span class="checktext">
+                                        <span class="checktitle">force_rebuild</span>
+                                    </span>
+                                </label>
+                                <label class="checkitem">
+                                    <input id="builds-debug" type="checkbox" />
+                                    <span class="checktext">
+                                        <span class="checktitle">debug</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </section>
+                    </div>
+                    <div class="row buttons">
+                        <button id="builds-create" type="button" class="build-run-btn">
+                            <svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                                <path d="M12 2a10 10 0 1 0 10 10A10.01 10.01 0 0 0 12 2Zm-2 14.5v-9l7 4.5Z" />
+                            </svg>
+                            <span>Build</span>
+                        </button>
+                    </div>
+                </div>
+            </details>
             <div id="builds-table" class="table"></div>
             <pre id="builds-error" class="error hidden"></pre>
             <div id="builds-request-tooltip" class="request-tooltip hidden" role="dialog" aria-live="polite">
@@ -66,68 +130,6 @@
                 </div>
             </div>
 
-            <div class="editor build-launch">
-                <h2>Start Build</h2>
-                <div class="build-sections">
-                    <section class="build-section">
-                        <h3 class="build-section-title">Version</h3>
-                        <div class="toolbar">
-                            <select id="builds-version" class="build-field"></select>
-                        </div>
-                    </section>
-                    <section class="build-section">
-                        <h3 class="build-section-title">target / subtarget / platform / profile</h3>
-                        <div class="toolbar">
-                            <select id="builds-target" class="build-field"></select>
-                            <select id="builds-subtarget" class="build-field"></select>
-                            <select id="builds-platform" class="build-field"></select>
-                            <select id="builds-profile" class="build-field"></select>
-                        </div>
-                    </section>
-                    <section class="build-section">
-                        <h3 class="build-section-title">sysupgrade / factory</h3>
-                        <div class="checklist build-images">
-                            <label class="checkitem">
-                                <input type="checkbox" data-group="builds-images" value="sysupgrade" checked />
-                                <span class="checktext">
-                                    <span class="checktitle">sysupgrade</span>
-                                </span>
-                            </label>
-                            <label class="checkitem">
-                                <input type="checkbox" data-group="builds-images" value="factory" />
-                                <span class="checktext">
-                                    <span class="checktitle">factory</span>
-                                </span>
-                            </label>
-                        </div>
-                    </section>
-                    <section class="build-section">
-                        <h3 class="build-section-title">build options</h3>
-                        <div class="checklist build-options">
-                            <label class="checkitem">
-                                <input id="builds-force" type="checkbox" />
-                                <span class="checktext">
-                                    <span class="checktitle">force_rebuild</span>
-                                </span>
-                            </label>
-                            <label class="checkitem">
-                                <input id="builds-debug" type="checkbox" />
-                                <span class="checktext">
-                                    <span class="checktitle">debug</span>
-                                </span>
-                            </label>
-                        </div>
-                    </section>
-                </div>
-                <div class="row buttons">
-                    <button id="builds-create" type="button" class="build-run-btn">
-                        <svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                            <path d="M12 2a10 10 0 1 0 10 10A10.01 10.01 0 0 0 12 2Zm-2 14.5v-9l7 4.5Z" />
-                        </svg>
-                        <span>Build</span>
-                    </button>
-                </div>
-            </div>
         </section>
 
         <section id="view-lists" class="view hidden" role="tabpanel" aria-labelledby="tab-lists" aria-hidden="true">

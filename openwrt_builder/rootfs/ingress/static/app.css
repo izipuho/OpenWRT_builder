@@ -166,8 +166,71 @@ body.modal-open {
     margin-bottom: 16px;
 }
 
+.build-launch-toggle {
+    width: 100%;
+    margin: 0 0 12px 0;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fff;
+    overflow: hidden;
+}
+
+.build-launch-toggle > summary {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+    color: #1c1c1c;
+    font-weight: 700;
+    border-bottom: 1px solid transparent;
+    transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.build-launch-toggle > summary:hover {
+    background: #f6f8fb;
+}
+
+.build-launch-toggle > summary::-webkit-details-marker {
+    display: none;
+}
+
+.build-launch-toggle > summary::after {
+    content: "";
+    width: 9px;
+    height: 9px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(-45deg);
+    transition: transform 140ms ease;
+    flex: 0 0 auto;
+}
+
+.build-launch-toggle[open] > summary::after {
+    transform: rotate(45deg);
+}
+
+.build-launch-toggle[open] > summary {
+    border-bottom-color: var(--border);
+}
+
+.build-launch {
+    display: flex;
+    flex-direction: column;
+    padding: 10px 12px 12px;
+    background: #fff;
+}
+
 .build-launch .toolbar {
-    margin: 0;
+    margin: 0 0 10px 0;
+}
+
+.build-launch .row.buttons {
+    margin: 12px 0 0 0;
+    justify-content: flex-end;
 }
 
 .build-sections {
