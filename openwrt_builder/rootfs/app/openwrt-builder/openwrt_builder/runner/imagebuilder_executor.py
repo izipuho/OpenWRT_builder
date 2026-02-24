@@ -150,6 +150,38 @@ class ImageBuilderExecutor:
         return text[-limit:]
 
     @staticmethod
+    def _summarize_make_failure(stderr_tail: str, stdout_tail: str, returncode: int) -> str:
+        combined = f"{stderr_tail}\n{stdout_tail}"
+        if re.search(r"No space left on device", combined, flags=re.IGNORECASE):
+            return "no_space_left"
+
+        too_big = re.search(r"is too big:\s*(\d+)\s*>\s*(\d+)", combined)
+        if too_big:
+            built_size, max_size = too_big.groups()
+            return f"image_too_big:built={built_size}:max={max_size}"
+
+        if (
+            re.search(r"curl:\s*\(\d+\)", combined)
+            or "The requested URL returned error" in combined
+            or "Failed to connect to" in combined
+            or "Could not resolve host" in combined
+        ):
+            return "imagebuilder_download_failed"
+
+        if (
+            re.search(r"Unknown package", combined, flags=re.IGNORECASE)
+            or re.search(r"conflicts with", combined, flags=re.IGNORECASE)
+            or re.search(r"check_data_file_clashes", combined, flags=re.IGNORECASE)
+            or re.search(r"Collected errors", combined, flags=re.IGNORECASE)
+        ):
+            return "package_conflict_or_not_found"
+
+        message = (stderr_tail or stdout_tail or f"make_failed:{returncode}").strip()
+        if not message:
+            return f"make_failed:{returncode}"
+        return message
+
+    @staticmethod
     def _read_new_chunk(path: Path, offset: int, *, max_bytes: int = _LOG_CHUNK_MAX) -> tuple[str, int]:
         if not path.exists():
             return "", offset
@@ -503,12 +535,12 @@ class ImageBuilderExecutor:
             if proc.returncode != 0:
                 stderr_tail = self._tail_file(stderr_log)
                 stdout_tail = self._tail_file(stdout_log)
-                message = stderr_tail or stdout_tail or f"make_failed:{proc.returncode}"
+                message = self._summarize_make_failure(stderr_tail, stdout_tail, proc.returncode)
                 self._emit_update(
                     on_update,
                     progress=94,
                     phase="failed",
-                    message=f"make_failed:{proc.returncode}",
+                    message=message,
                     stdout_path=stdout_log,
                     stderr_path=stderr_log,
                     phase_event=True,
