@@ -21,6 +21,7 @@ _IMAGE_SUFFIX = {
     "factory": "squashfs-factory.bin",
 }
 _LOG_CHUNK_MAX = 8192
+_FILES_DESCRIPTORS_BASENAME = ".descriptors.json"
 
 
 class BuildCanceled(RuntimeError):
@@ -303,7 +304,7 @@ class ImageBuilderExecutor:
         if path.exists():
             shutil.rmtree(path, ignore_errors=True)
 
-    def _resolve_profile(self, profile_id: str) -> tuple[list[str], list[str], list[str]]:
+    def _resolve_profile(self, profile_id: str) -> tuple[list[str], list[str], list[tuple[str, str]]]:
         try:
             profile_payload = self._json_load(self._profiles_dir / f"{profile_id}.json")
         except FileNotFoundError as exc:
@@ -344,9 +345,62 @@ class ImageBuilderExecutor:
         raw_files = profile.get("files") or []
         if not isinstance(raw_files, list):
             raise ValueError("invalid_profile_files")
-        selected_files = [self._safe_file_rel(str(path)) for path in raw_files]
+        descriptor_map = self._load_file_descriptors()
+        selected_files = self._resolve_selected_files(raw_files, descriptor_map)
 
-        return self._uniq(include), self._uniq(exclude), self._uniq(selected_files)
+        return self._uniq(include), self._uniq(exclude), selected_files
+
+    def _load_file_descriptors(self) -> dict[str, tuple[str, str]]:
+        path = self._files_dir / _FILES_DESCRIPTORS_BASENAME
+        if not path.exists():
+            return {}
+        try:
+            payload = self._json_load(path)
+        except ValueError:
+            return {}
+        rows = payload.get("files")
+        if not isinstance(rows, list):
+            return {}
+        out: dict[str, tuple[str, str]] = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            file_id = str(row.get("id") or "").strip()
+            source_raw = row.get("source_path")
+            if not isinstance(source_raw, str):
+                continue
+            target_raw = row.get("target_path")
+            target_value = source_raw if not isinstance(target_raw, str) else target_raw
+            try:
+                source_path = self._safe_file_rel(source_raw)
+                target_path = self._safe_file_rel(target_value)
+            except ValueError:
+                continue
+            if file_id:
+                out[file_id] = (source_path, target_path)
+        return out
+
+    def _resolve_selected_files(
+        self,
+        raw_files: list[Any],
+        descriptors: dict[str, tuple[str, str]],
+    ) -> list[tuple[str, str]]:
+        selected: list[tuple[str, str]] = []
+        seen: set[tuple[str, str]] = set()
+        for item in raw_files:
+            file_ref = str(item or "").strip()
+            if not file_ref:
+                raise ValueError("invalid_profile_file_path")
+            pair = descriptors.get(file_ref)
+            if pair is None:
+                # Backward compatibility: old profiles store source path directly.
+                rel = self._safe_file_rel(file_ref)
+                pair = (rel, rel)
+            if pair in seen:
+                continue
+            seen.add(pair)
+            selected.append(pair)
+        return selected
 
     @staticmethod
     def _write_build_config(
@@ -380,16 +434,16 @@ class ImageBuilderExecutor:
         return cfg_path
 
     @staticmethod
-    def _sync_files(src: Path, dst: Path, selected_files: list[str]) -> None:
+    def _sync_files(src: Path, dst: Path, selected_files: list[tuple[str, str]]) -> None:
         if dst.exists():
             shutil.rmtree(dst)
         if not selected_files:
             return
-        for rel in selected_files:
-            src_path = src / rel
+        for src_rel, dst_rel in selected_files:
+            src_path = src / src_rel
             if not src_path.is_file():
-                raise FileNotFoundError(f"selected_file_not_found:{rel}")
-            dst_path = dst / rel
+                raise FileNotFoundError(f"selected_file_not_found:{src_rel}")
+            dst_path = dst / dst_rel
             dst_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src_path, dst_path)
 

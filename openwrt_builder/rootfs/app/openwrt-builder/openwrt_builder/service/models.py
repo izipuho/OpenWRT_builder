@@ -1,6 +1,7 @@
 """Typed service-layer payload models."""
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -9,6 +10,26 @@ BuildState = Literal["queued", "running", "done", "failed", "canceled"]
 ImageKind = Literal["sysupgrade", "factory"]
 ArtifactType = Literal["firmware", "metadata"]
 ArtifactRole = Literal["primary", "optional", "checksum", "manifest"]
+_SAFE_FILE_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+
+
+def validate_rel_path(value: str) -> str:
+    """Validate and normalize a relative filesystem path."""
+    raw = str(value or "").strip().replace("\\", "/")
+    if not raw:
+        raise ValueError("invalid_path")
+    parts = raw.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        raise ValueError("invalid_path")
+    return "/".join(parts)
+
+
+def validate_file_id(value: str) -> str:
+    """Validate file descriptor identifier format."""
+    file_id = str(value or "").strip()
+    if not file_id or not _SAFE_FILE_ID_RE.match(file_id):
+        raise ValueError("invalid_file_id")
+    return file_id
 
 
 def validate_output_images(values: list[ImageKind]) -> list[ImageKind]:
@@ -124,3 +145,48 @@ class ListModel(BaseConfigModel):
 
     list_id: str | None = None
     list: dict[str, Any]
+
+
+class FileDescriptorModel(StrictModel):
+    """Persisted file descriptor."""
+
+    id: str
+    source_path: str
+    target_path: str
+
+    @field_validator("id")
+    @classmethod
+    def _validate_id(cls, value: str) -> str:
+        return validate_file_id(value)
+
+    @field_validator("source_path", "target_path")
+    @classmethod
+    def _validate_paths(cls, value: str) -> str:
+        return validate_rel_path(value)
+
+
+class FileDescriptorsIndexModel(StrictModel):
+    """Descriptor index persisted in ``.descriptors.json``."""
+
+    schema_version: int = 1
+    files: list[FileDescriptorModel] = Field(default_factory=list)
+
+
+class FileRowModel(StrictModel):
+    """Expanded file row returned by files API/listing."""
+
+    id: str
+    source_path: str
+    target_path: str
+    size: int = Field(ge=0)
+    updated_at: str
+
+    @field_validator("id")
+    @classmethod
+    def _validate_id(cls, value: str) -> str:
+        return validate_file_id(value)
+
+    @field_validator("source_path", "target_path")
+    @classmethod
+    def _validate_paths(cls, value: str) -> str:
+        return validate_rel_path(value)

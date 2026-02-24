@@ -450,12 +450,16 @@ async function getFileChoices() {
     const rows = await apiJson(`${API}/files`);
     return rows
         .map((r) => {
-            const path = String(r.path || "").trim();
-            if (!path) return null;
+            const id = String(r.id || "").trim();
+            const sourcePath = String(r.source_path || r.path || "").trim();
+            const targetPath = String(r.target_path || sourcePath).trim();
+            if (!id || !sourcePath || !targetPath) return null;
             return {
-                id: path,
-                title: path,
-                meta: typeof r.size === "number" ? `${r.size} bytes` : "",
+                id,
+                sourcePath,
+                targetPath,
+                title: sourcePath === targetPath ? sourcePath : `${sourcePath} -> ${targetPath}`,
+                meta: typeof r.size === "number" ? `${r.size} bytes` : id,
             };
         })
         .filter(Boolean);
@@ -573,7 +577,13 @@ function profileEditorHtml(id, model, listOptions, fileOptions) {
     const name = model?.name || "";
     const normalizedFileOptions = Array.isArray(fileOptions) ? fileOptions : [];
     const availableFileIds = new Set(normalizedFileOptions.map((o) => o.id));
-    const selectedExistingFiles = selectedFiles.filter((v) => availableFileIds.has(v));
+    const sourcePathToId = new Map(
+        normalizedFileOptions.map((o) => [String(o.sourcePath || ""), o.id])
+    );
+    const normalizedSelectedFiles = selectedFiles
+        .map((v) => sourcePathToId.get(String(v || "")) || String(v || ""))
+        .filter(Boolean);
+    const selectedExistingFiles = normalizedSelectedFiles.filter((v) => availableFileIds.has(v));
     const defaultSelectedFiles = !id && selectedFiles.length === 0
         ? normalizedFileOptions.map((o) => o.id)
         : selectedExistingFiles;
@@ -1298,16 +1308,19 @@ function renderFilesTable(rows) {
     const html = `
     <table>
       <thead>
-        <tr><th>path</th><th>size</th><th>updated_at</th><th></th></tr>
+        <tr><th>id</th><th>source_path</th><th>target_path</th><th>size</th><th>updated_at</th><th></th></tr>
       </thead>
       <tbody>
         ${sortedRows.map((r) => `
           <tr>
-            <td>${escapeHtml(r.path ?? "")}</td>
+            <td>${escapeHtml(r.id ?? "")}</td>
+            <td>${escapeHtml(r.source_path ?? r.path ?? "")}</td>
+            <td>${escapeHtml(r.target_path ?? r.source_path ?? r.path ?? "")}</td>
             <td>${escapeHtml(String(r.size ?? ""))}</td>
             <td>${renderUpdatedAtCell(r.updated_at)}</td>
             <td class="actions">
-              <button type="button" data-act="del" data-path="${escapeAttr(r.path ?? "")}">Delete</button>
+              <button type="button" data-act="target" data-id="${escapeAttr(r.id ?? "")}" data-target="${escapeAttr(r.target_path ?? r.source_path ?? r.path ?? "")}">Target</button>
+              <button type="button" data-act="del" data-path="${escapeAttr(r.source_path ?? r.path ?? "")}">Delete</button>
             </td>
           </tr>
         `).join("")}
@@ -1316,6 +1329,13 @@ function renderFilesTable(rows) {
   `;
     el("files-table").innerHTML = html;
 
+    el("files-table").querySelectorAll("button[data-act='target']").forEach((b) => {
+        b.addEventListener("click", async () => {
+            const fileId = String(b.getAttribute("data-id") || "").trim();
+            const currentTarget = String(b.getAttribute("data-target") || "").trim();
+            await updateFileTarget(fileId, currentTarget);
+        });
+    });
     el("files-table").querySelectorAll("button[data-act='del']").forEach((b) => {
         b.addEventListener("click", async () => {
             const path = b.getAttribute("data-path");
@@ -1333,25 +1353,49 @@ async function refreshFiles() {
 async function uploadFiles() {
     showFilesError("");
     const input = el("files-input");
+    const targetInput = el("files-target-path");
+    const targetPath = String(targetInput?.value || "").trim();
     const files = Array.from(input.files || []);
     if (!files.length) {
         showFilesError("Select at least one file");
+        return;
+    }
+    if (targetPath && files.length > 1) {
+        showFilesError("target_path can be set only for single file upload");
         return;
     }
 
     for (const file of files) {
         const fd = new FormData();
         fd.append("file", file, file.name);
+        if (targetPath) fd.append("target_path", targetPath);
         await apiJson(`${API}/file`, { method: "POST", body: fd });
     }
 
     input.value = "";
+    if (targetInput) targetInput.value = "";
     await refreshFiles();
 }
 
 async function deleteFile(path) {
     showFilesError("");
     await apiJson(`${API}/file/${encodeURIComponent(path)}`, { method: "DELETE" });
+    await refreshFiles();
+}
+
+async function updateFileTarget(fileId, currentTarget) {
+    showFilesError("");
+    const nextTarget = window.prompt("target_path in rootfs (example: etc/config/network)", String(currentTarget || ""));
+    if (nextTarget === null) return;
+    const normalized = String(nextTarget || "").trim();
+    if (!normalized) {
+        showFilesError("target_path is required");
+        return;
+    }
+    await apiJson(`${API}/file-meta/${encodeURIComponent(fileId)}`, {
+        method: "PUT",
+        body: JSON.stringify({ target_path: normalized }),
+    });
     await refreshFiles();
 }
 
