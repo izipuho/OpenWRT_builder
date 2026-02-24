@@ -170,17 +170,3 @@ def import_lists(req: Request):
         "skipped": skipped,
         "errors": errors,
     }
-
-# =========================
-# Misc
-# =========================
-
-@router.post("/debug", status_code=201)
-def debug(req: Request, body: dict) -> list:
-    """Run simple debug commands and return results."""
-    res: list = []
-    if body["command"] == "ls":
-        from pathlib import Path
-        for path in Path(body["path"]).iterdir():
-            res.append(path)
-    return res
