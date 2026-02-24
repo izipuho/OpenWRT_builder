@@ -45,7 +45,7 @@ cd openwrt_builder
 docker compose -f docker-compose.standalone.yml up -d --build
 ```
 
-Then open `http://localhost:8080`. For production, set `OPENWRT_BUILDER_CORS_ORIGINS` via shell environment or project `.env` to your real UI hostname(s).
+Then open `http://localhost:8081` (the compose file maps host port 8081 to container port 8080). For production, set `OPENWRT_BUILDER_CORS_ORIGINS` via shell environment or project `.env` to your real UI hostname(s).
 
 ## Convert External Package Lists
 
