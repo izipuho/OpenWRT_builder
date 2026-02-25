@@ -1,0 +1,15 @@
+{
+  "name": "TOR",
+  "schema_version": 1,
+  "updated_at": "2026-02-22T08:30:47Z",
+  "list_id": null,
+  "list": {
+    "include": [
+      "tor",
+      "tor-geoip",
+      "tor-resolve",
+      "obfs4proxy"
+    ],
+    "exclude": []
+  }
+}

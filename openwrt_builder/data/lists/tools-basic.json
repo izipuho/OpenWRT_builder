@@ -1,0 +1,36 @@
+{
+  "name": "Tools Basic",
+  "schema_version": 1,
+  "updated_at": "2026-02-22T08:30:47Z",
+  "list_id": null,
+  "list": {
+    "include": [
+      "kmod",
+      "dmesg",
+      "grep",
+      "bind-host",
+      "diffutils",
+      "hostapd-utils",
+      "iwinfo",
+      "ip-bridge",
+      "ip-full",
+      "ethtool-full",
+      "lsof",
+      "lscpu",
+      "lsblk",
+      "tcpdump",
+      "terminfo",
+      "iperf3",
+      "mtr",
+      "less-wide",
+      "pv",
+      "losetup",
+      "make",
+      "curl",
+      "wget-ssl",
+      "rsync",
+      "wakeonlan"
+    ],
+    "exclude": []
+  }
+}

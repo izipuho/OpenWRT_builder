@@ -1,0 +1,17 @@
+{
+  "name": "USB Net",
+  "schema_version": 1,
+  "updated_at": "2026-02-22T08:30:47Z",
+  "list_id": null,
+  "list": {
+    "include": [
+      "kmod-usb-net-asix-ax88179",
+      "kmod-usb-net-asix",
+      "kmod-usb-net-rtl8150",
+      "kmod-usb-net-rtl8152",
+      "kmod-usb-net-lan78xx",
+      "kmod-usb-net-aqc111"
+    ],
+    "exclude": []
+  }
+}

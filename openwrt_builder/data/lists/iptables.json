@@ -1,0 +1,16 @@
+{
+  "name": "IPtables",
+  "schema_version": 1,
+  "updated_at": "2026-02-22T08:30:47Z",
+  "list_id": null,
+  "list": {
+    "include": [
+      "iptables",
+      "ip6tables",
+      "kmod-ipt-offload",
+      "ipset",
+      "kmod-ipt-ipset"
+    ],
+    "exclude": []
+  }
+}
