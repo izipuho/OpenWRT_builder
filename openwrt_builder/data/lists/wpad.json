@@ -1,0 +1,14 @@
+{
+  "name": "Wpad",
+  "schema_version": 1,
+  "updated_at": "2026-02-22T08:30:47Z",
+  "list_id": null,
+  "list": {
+    "include": [
+      "wpad-mbedtls"
+    ],
+    "exclude": [
+      "wpad-basic-mbedtls"
+    ]
+  }
+}

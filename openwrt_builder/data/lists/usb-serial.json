@@ -1,0 +1,13 @@
+{
+  "name": "Usb Serial",
+  "schema_version": 1,
+  "updated_at": "2026-02-22T08:30:47Z",
+  "list_id": null,
+  "list": {
+    "include": [
+      "kmod-usb-serial-ftdi",
+      "kmod-usb-serial-pl2303"
+    ],
+    "exclude": []
+  }
+}

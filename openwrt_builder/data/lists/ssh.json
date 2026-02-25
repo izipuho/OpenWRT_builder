@@ -1,0 +1,17 @@
+{
+  "name": "Ssh",
+  "schema_version": 1,
+  "updated_at": "2026-02-22T08:30:47Z",
+  "list_id": null,
+  "list": {
+    "include": [
+      "openssh-server",
+      "openssh-sftp-server",
+      "openssh-client",
+      "openssh-sftp-client"
+    ],
+    "exclude": [
+      "dropbear"
+    ]
+  }
+}

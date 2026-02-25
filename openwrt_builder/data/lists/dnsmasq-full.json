@@ -1,0 +1,16 @@
+{
+  "name": "Dnsmasq Full",
+  "schema_version": 1,
+  "updated_at": "2026-02-22T08:30:47Z",
+  "list_id": null,
+  "list": {
+    "include": [
+      "dnsmasq-full",
+      "odhcp6c",
+      "odhcpd-ipv6only"
+    ],
+    "exclude": [
+      "dnsmasq"
+    ]
+  }
+}
