@@ -9,8 +9,7 @@ COPY rootfs /
 COPY imagebuilder-wrapper /app/imagebuilder-wrapper
 
 FROM runtime AS standalone
-RUN chmod +x /usr/local/bin/standalone-entrypoint.sh
 EXPOSE 8080
-ENTRYPOINT ["/usr/local/bin/standalone-entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/openwrt-builder-launcher.sh", "standalone"]
 
 FROM runtime AS ha-addon
